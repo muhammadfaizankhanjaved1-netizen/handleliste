@@ -81,7 +81,7 @@ function renderCard(item) {
   const drop = priceDrop(item);
   const priceHtml = item.price_current
     ? `<div class="card-price">${fmt(item.price_current)}</div>`
-    : `<div class="card-price no-price">${item.status === "pending" ? "—" : "Ingen pris"}</div>`;
+    : `<div class="card-price no-price">${item.status === "pending" ? "—" : item.utsolgt ? "Utsolgt" : "Ingen pris"}</div>`;
 
   const actionBtns = item.status !== "pending" ? `
     <div class="card-actions">
