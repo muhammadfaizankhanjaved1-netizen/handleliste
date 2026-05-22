@@ -361,18 +361,15 @@ function startAutoRefresh() {
   }, 2 * 60 * 1000);
 }
 
-// ── Clipboard detect ──────────────────────────────────────────────────────────
-async function checkClipboard() {
+// ── Paste-knapp ───────────────────────────────────────────────────────────────
+async function pasteFromClipboard() {
   try {
     const text = await navigator.clipboard.readText();
-    if (!text || !text.startsWith("http")) return;
-    if (data.items.find(i => i.url === text)) return;
-    const inp = document.getElementById("add-input");
-    inp.value = text;
-    toast("Lenke funnet — trykk Legg til");
-    inp.focus();
+    if (!text || !text.startsWith("http")) { toast("Ingen lenke i utklippstavlen", true); return; }
+    document.getElementById("add-input").value = text;
+    toast("Lenke limt inn — trykk Legg til");
   } catch {
-    // Clipboard-tilgang ikke tilgjengelig — stille feil
+    toast("Kunne ikke lese utklippstavlen", true);
   }
 }
 
@@ -389,7 +386,6 @@ async function boot() {
   render();
   handleSharedUrl();
   startAutoRefresh();
-  checkClipboard();
 }
 
 document.addEventListener("DOMContentLoaded", boot);

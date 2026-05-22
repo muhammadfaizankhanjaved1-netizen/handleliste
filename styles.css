@@ -175,6 +175,17 @@ body {
 }
 .btn-add:hover { background: var(--accent-dim); }
 .btn-add:disabled { opacity: .5; cursor: default; }
+.btn-paste {
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  cursor: pointer;
+  line-height: 44px;
+  height: 44px;
+}
 
 /* ── Grid ── */
 .grid {

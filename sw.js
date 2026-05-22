@@ -1,4 +1,4 @@
-const CACHE = "handleliste-v1";
+const CACHE = "handleliste-v3";
 const SHELL = ["./", "./index.html", "./app.js", "./styles.css", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", e => {
