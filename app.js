@@ -12,6 +12,7 @@ const STATUS_LABELS = { pending:"Henter...", ønske:"Ønske", sparer_til:"Sparer
 let data = { categories: CATEGORIES, items: [] };
 let view = "wishlist";   // wishlist | months | archive
 let filters = { cat: null, status: null, month: null };
+let sort = "newest";     // newest | price_asc | price_desc | name
 
 // ── JSONBin ──────────────────────────────────────────────────────────────────
 async function load() {
@@ -114,11 +115,17 @@ function activeItems() {
   return data.items.filter(i => i.status !== "kjøpt");
 }
 function filteredItems() {
-  return activeItems().filter(i => {
+  const items = activeItems().filter(i => {
     if (filters.cat && !(i.categories || []).includes(filters.cat)) return false;
     if (filters.status && i.status !== filters.status) return false;
     if (filters.month && i.month !== filters.month) return false;
     return true;
+  });
+  return items.sort((a, b) => {
+    if (sort === "price_asc")  return (a.price_current || Infinity) - (b.price_current || Infinity);
+    if (sort === "price_desc") return (b.price_current || 0) - (a.price_current || 0);
+    if (sort === "name")       return (a.name || "").localeCompare(b.name || "", "nb");
+    return new Date(b.added_at || 0) - new Date(a.added_at || 0);
   });
 }
 
@@ -206,6 +213,14 @@ function renderTotals() {
 
 function renderFilters() {
   const bar = document.getElementById("filter-bar");
+  const sortBtns = [
+    { key: "newest",     label: "Nyeste" },
+    { key: "price_asc",  label: "Billigst" },
+    { key: "price_desc", label: "Dyreste" },
+    { key: "name",       label: "Navn A–Å" },
+  ].map(s =>
+    `<button class="filter-btn sort-btn ${sort === s.key ? "active" : ""}" onclick="setSort('${s.key}')">${s.label}</button>`
+  ).join("");
   const statusBtns = STATUS_ORDER.filter(s => s !== "kjøpt").map(s =>
     `<button class="filter-btn ${filters.status === s ? "active" : ""}" onclick="toggleFilter('status','${s}')">${STATUS_LABELS[s]}</button>`
   ).join("");
@@ -217,6 +232,8 @@ function renderFilters() {
   ).join("");
 
   bar.innerHTML = `
+    <span class="filter-sep">Sorter:</span>${sortBtns}
+    <span class="filter-sep">Filter:</span>
     <button class="filter-btn ${!filters.cat && !filters.status && !filters.month ? "active" : ""}" onclick="clearFilters()">Alle</button>
     ${statusBtns}${catBtns}${monthBtns}`;
 }
@@ -227,6 +244,10 @@ function toggleFilter(key, val) {
 }
 function clearFilters() {
   filters = { cat: null, status: null, month: null };
+  render();
+}
+function setSort(key) {
+  sort = key;
   render();
 }
 
@@ -332,13 +353,34 @@ function handleSharedUrl() {
   setTimeout(() => inp.focus(), 300);
 }
 
+// ── Auto-refresh ──────────────────────────────────────────────────────────────
+function startAutoRefresh() {
+  setInterval(async () => {
+    await load();
+    render();
+  }, 2 * 60 * 1000);
+}
+
+// ── Clipboard detect ──────────────────────────────────────────────────────────
+async function checkClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text || !text.startsWith("http")) return;
+    if (data.items.find(i => i.url === text)) return;
+    const inp = document.getElementById("add-input");
+    inp.value = text;
+    toast("Lenke funnet — trykk Legg til");
+    inp.focus();
+  } catch {
+    // Clipboard-tilgang ikke tilgjengelig — stille feil
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function boot() {
-  // theme
   const saved = localStorage.getItem("hl-theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
 
-  // SW
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
   }
@@ -346,6 +388,8 @@ async function boot() {
   await load();
   render();
   handleSharedUrl();
+  startAutoRefresh();
+  checkClipboard();
 }
 
 document.addEventListener("DOMContentLoaded", boot);

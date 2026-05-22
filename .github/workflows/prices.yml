@@ -1,12 +1,12 @@
-name: Hent nye varer
+name: Oppdater priser daglig
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '0 7 * * *'
   workflow_dispatch:
 
 jobs:
-  scrape:
+  prices:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,4 +15,4 @@ jobs:
           python-version: '3.11'
       - run: pip install requests beautifulsoup4 lxml playwright
       - run: playwright install chromium --with-deps
-      - run: python scraper/process_queue.py
+      - run: python scraper/update_prices.py
