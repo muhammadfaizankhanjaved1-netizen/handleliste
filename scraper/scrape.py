@@ -2,10 +2,73 @@ import re
 import json
 import time
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 import requests
 from bs4 import BeautifulSoup
+
+# ── Shopify JSON API ──────────────────────────────────────────────────────────
+def _shopify_scrape(url: str) -> dict | None:
+    """Henter produkt via Shopify sitt eget JSON-endepunkt — ingen blokkering."""
+    parsed = urlparse(url)
+    path = parsed.path.rstrip("/")
+    # Ekstraher product handle fra URL
+    m = re.search(r"/products/([^/?#]+)", path)
+    if not m:
+        return None
+    handle = m.group(1)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    api_url = f"{base}/products/{handle}.json"
+    try:
+        r = requests.get(api_url, headers={"User-Agent": USER_AGENT}, timeout=10)
+        if not r.ok:
+            return None
+        p = r.json().get("product", {})
+        if not p:
+            return None
+        name  = p.get("title")
+        image = (p.get("images") or [{}])[0].get("src")
+        price_raw = (p.get("variants") or [{}])[0].get("price")
+        price = parse_nok_price(str(price_raw)) if price_raw else None
+        return {"name": name, "image": image, "price_current": price, "error": None}
+    except Exception as e:
+        return {"error": str(e)}
+
+# ── Zalando API ───────────────────────────────────────────────────────────────
+def _zalando_scrape(url: str) -> dict | None:
+    """Henter produkt via Zalando sin offentlige katalog-API."""
+    m = re.search(r"-([A-Z0-9]{2}\d{3}[A-Z0-9][\w-]{0,10})-[A-Z]\d+\.html", url, re.IGNORECASE)
+    if not m:
+        # Prøv å finne artikkel-ID på slutten av URL-en
+        m = re.search(r"([a-z0-9]{2}\d{3}[a-z0-9][\w-]{0,10})\.html", url, re.IGNORECASE)
+    if not m:
+        return None
+    article_id = m.group(1).upper()
+    try:
+        api_url = f"https://api.zalando.com/articles/{article_id}"
+        headers = {
+            "User-Agent": USER_AGENT,
+            "Accept-Language": "nb-NO,nb;q=0.9",
+        }
+        r = requests.get(api_url, headers=headers, timeout=10)
+        if not r.ok:
+            return None
+        d = r.json()
+        name  = d.get("name")
+        units = d.get("units", [{}])
+        price = None
+        for u in units:
+            p = u.get("price", {}).get("value")
+            if p:
+                price = int(float(p))
+                break
+        image = None
+        imgs = d.get("media", {}).get("images", [])
+        if imgs:
+            image = imgs[0].get("largeHdUrl") or imgs[0].get("largeUrl")
+        return {"name": name, "image": image, "price_current": price, "error": None}
+    except Exception as e:
+        return {"error": str(e)}
 
 SELECTORS_FILE = Path(__file__).parent.parent / "selectors.json"
 USER_AGENT = (
@@ -38,8 +101,9 @@ def parse_nok_price(text) -> int | None:
     text = text.replace(",-", "").replace(":-", "").strip()
     text = re.sub(r"\s| ", "", text)
     # remove trailing ,00 or .00
-    text = re.sub(r"[,.]00$", "", text)
-    # remove all remaining dots and commas (thousands separators)
+    # fjern desimaldel (.90 / ,90) — norske priser er alltid hele kroner
+    text = re.sub(r"[,.](\d{2})$", "", text)
+    # fjern tusenskilletegn
     text = re.sub(r"[,.]", "", text)
     text = re.sub(r"[^\d]", "", text)
     try:
@@ -208,6 +272,22 @@ def scrape(url: str) -> dict:
 
     result = {"name": None, "image": None, "price_current": None,
               "currency": "NOK", "categories": [], "error": None}
+
+    # Step 0: Zalando-spesifikk API
+    if "zalando." in domain:
+        zr = _zalando_scrape(url)
+        if zr and (zr.get("name") or zr.get("price_current")):
+            result.update({k: v for k, v in zr.items() if v is not None})
+            result["categories"] = guess_categories(url, result.get("name") or "")
+            return result
+
+    # Step 0b: Shopify JSON API (for boozt, extremefitness, dahlbergs osv.)
+    if re.search(r"/products/", url):
+        sr = _shopify_scrape(url)
+        if sr and (sr.get("name") or sr.get("price_current")):
+            result.update({k: v for k, v in sr.items() if v is not None})
+            result["categories"] = guess_categories(url, result.get("name") or "")
+            return result
 
     # Step 1: og:meta + JSON-LD + source regex via requests
     try:
