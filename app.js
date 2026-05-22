@@ -319,9 +319,10 @@ function openEdit(id) {
   if (!item) return;
   editId = id;
 
-  document.getElementById("edit-name").value = item.name || "";
-  document.getElementById("edit-month").value = item.month || "";
-  document.getElementById("edit-notes").value = item.notes || "";
+  document.getElementById("edit-name").value  = item.name || "";
+  document.getElementById("edit-price").value = item.price_current || "";
+  document.getElementById("edit-month").value  = item.month || "";
+  document.getElementById("edit-notes").value  = item.notes || "";
   document.getElementById("edit-status").value = item.status;
 
   CATEGORIES.forEach(c => {
@@ -340,10 +341,16 @@ function closeModal() {
 async function saveEdit() {
   const item = data.items.find(i => i.id === editId);
   if (!item) return;
-  item.name       = document.getElementById("edit-name").value.trim() || item.name;
-  item.month      = document.getElementById("edit-month").value || null;
-  item.notes      = document.getElementById("edit-notes").value.trim();
-  item.status     = document.getElementById("edit-status").value;
+  item.name   = document.getElementById("edit-name").value.trim() || item.name;
+  item.month  = document.getElementById("edit-month").value || null;
+  item.notes  = document.getElementById("edit-notes").value.trim();
+  item.status = document.getElementById("edit-status").value;
+  const newPrice = parseInt(document.getElementById("edit-price").value, 10);
+  if (newPrice && newPrice !== item.price_current) {
+    item.price_current = newPrice;
+    const today = new Date().toISOString().slice(0, 10);
+    item.price_history = [...(item.price_history || []), { date: today, price: newPrice }];
+  }
   item.categories = CATEGORIES.filter(c => document.getElementById("cb-" + c)?.checked);
   if (item.status === "kjøpt" && !item.purchased_at) item.purchased_at = new Date().toISOString();
   closeModal();
