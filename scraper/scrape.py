@@ -48,6 +48,48 @@ def parse_nok_price(text) -> int | None:
         return None
 
 
+def _source_price(html: str) -> int | None:
+    """Last-resort: find price in JS data blobs in page source."""
+    patterns = [
+        r'"salesPrice"[:\s]+(\d[\d .,]+)',
+        r'"currentPrice"[:\s]+(\d[\d .,]+)',
+        r'"salePrice"[:\s]+(\d[\d .,]+)',
+        r'"price"[:\s]+"?(\d[\d .,]+)"?',
+    ]
+    for pat in patterns:
+        matches = re.findall(pat, html)
+        for m in matches:
+            p = parse_nok_price(m)
+            if p and 10 < p < 500_000:
+                return p
+    return None
+
+
+def _json_ld(soup: BeautifulSoup) -> dict:
+    result = {"name": None, "image": None, "price_raw": None}
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "")
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                t = item.get("@type", "")
+                if t in ("Product", "ProductGroup", "ItemPage"):
+                    result["name"] = result["name"] or item.get("name")
+                    img = item.get("image")
+                    if img and not result["image"]:
+                        result["image"] = img[0] if isinstance(img, list) else img
+                    offers = item.get("offers") or item.get("offer")
+                    if offers:
+                        if isinstance(offers, list):
+                            offers = offers[0]
+                        result["price_raw"] = (
+                            offers.get("price") or offers.get("lowPrice")
+                        )
+        except Exception:
+            continue
+    return result
+
+
 def _og_meta(soup: BeautifulSoup) -> dict:
     def meta(prop):
         tag = soup.find("meta", property=prop) or soup.find("meta", attrs={"name": prop})
@@ -96,10 +138,22 @@ def _playwright_scrape(url: str, selectors: dict) -> dict:
                 except PWTimeout:
                     pass
 
-            # image always from og:meta in page source
-            og_img = page.query_selector("meta[property='og:image']")
-            if og_img:
-                result["image"] = og_img.get_attribute("content")
+            # parse full rendered page for og:meta + JSON-LD
+            try:
+                ld_src = page.content()
+                ld_soup = BeautifulSoup(ld_src, "lxml")
+                og_img = ld_soup.find("meta", property="og:image")
+                if og_img:
+                    result["image"] = og_img.get("content")
+                ld = _json_ld(ld_soup)
+                if not result["image"]:
+                    result["image"] = ld.get("image")
+                if not result.get("price_raw") and ld.get("price_raw") is not None:
+                    result["price_raw"] = str(ld["price_raw"])
+                if not result.get("name") and ld.get("name"):
+                    result["name"] = ld["name"]
+            except Exception:
+                pass
 
         except Exception as e:
             result["error"] = str(e)
@@ -155,15 +209,27 @@ def scrape(url: str) -> dict:
     result = {"name": None, "image": None, "price_current": None,
               "currency": "NOK", "categories": [], "error": None}
 
-    # Step 1: og:meta via requests
+    # Step 1: og:meta + JSON-LD + source regex via requests
     try:
         resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=12)
         soup = BeautifulSoup(resp.text, "lxml")
         og = _og_meta(soup)
-        result["name"]    = og["name"]
-        result["image"]   = og["image"]
+        ld = _json_ld(soup)
+        raw_name = og["name"] or ld["name"]
+        if raw_name:
+            # Strip " | Butikknavn" suffix
+            raw_name = re.sub(r"\s*\|.*$", "", raw_name).strip()
+            # Clean "Navn - Kategori - Navn" duplicates
+            if " - " in raw_name:
+                parts = [p.strip() for p in raw_name.split(" - ")]
+                if parts[0] == parts[-1] or (len(parts) >= 3 and parts[0] == parts[2]):
+                    raw_name = parts[0]
+        result["name"]     = raw_name
+        result["image"]    = og["image"] or ld["image"]
         result["currency"] = og["currency"] or "NOK"
-        price = parse_nok_price(og["price_raw"])
+        price = (parse_nok_price(og["price_raw"])
+                 or parse_nok_price(ld["price_raw"])
+                 or _source_price(resp.text))
         if price:
             result["price_current"] = price
     except Exception as e:
