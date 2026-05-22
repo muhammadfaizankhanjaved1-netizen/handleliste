@@ -53,10 +53,14 @@
 
 <!-- ── Add bar ── -->
 <div class="add-bar">
-  <input id="add-input" class="add-input" type="url" placeholder="Lim inn lenke fra Zalando, XXL, …"
+  <input id="add-input" class="add-input" type="text" placeholder="Lim inn lenke…"
          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
   <button class="btn-paste" onclick="pasteFromClipboard()" title="Lim inn">📋</button>
   <button class="btn-add" id="btn-add" onclick="handleAdd()">Legg til</button>
+</div>
+<div class="add-extra">
+  <input id="add-name" class="add-extra-input" type="text" placeholder="Navn (valgfritt)">
+  <input id="add-price" class="add-extra-input add-price-input" type="number" placeholder="Pris kr" min="0">
 </div>
 
 <!-- ── Main content ── -->

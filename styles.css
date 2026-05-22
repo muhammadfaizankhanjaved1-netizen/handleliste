@@ -186,6 +186,24 @@ body {
   line-height: 44px;
   height: 44px;
 }
+.add-extra {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+.add-extra-input {
+  flex: 1;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: .85rem;
+}
+.add-extra-input:focus { border-color: var(--accent); outline: none; }
+.add-extra-input::placeholder { color: var(--subtext); }
+.add-price-input { max-width: 110px; flex: none; }
 
 /* ── Grid ── */
 .grid {

@@ -268,17 +268,28 @@ async function addItem(url) {
   if (!url || !url.startsWith("http")) { toast("Lim inn en gyldig URL", true); return; }
   if (data.items.find(i => i.url === url)) { toast("Lenken er allerede i lista"); return; }
 
+  const manualName  = document.getElementById("add-name").value.trim();
+  const manualPrice = parseInt(document.getElementById("add-price").value, 10) || null;
+  const now         = new Date().toISOString();
+
   const item = {
-    id: uuid(), url, status: "pending", name: null, image: null,
-    price_current: null, price_history: [], currency: "NOK",
+    id: uuid(), url,
+    status: manualName ? "ønske" : "pending",
+    name:   manualName || null,
+    image:  null,
+    price_current: manualPrice,
+    price_history: manualPrice ? [{ date: now.slice(0,10), price: manualPrice }] : [],
+    currency: "NOK",
     categories: [], subcategory: "", month: null, notes: "",
-    last_error: null, added_at: new Date().toISOString(), purchased_at: null,
+    last_error: null, added_at: now, purchased_at: null,
   };
   data.items.unshift(item);
+  document.getElementById("add-name").value  = "";
+  document.getElementById("add-price").value = "";
   render();
   try {
     await save();
-    toast("Lagt til! PCen henter info neste gang den er på.");
+    toast(manualName ? "Lagt til!" : "Lagt til! Henter info automatisk…");
   } catch (e) {
     toast("Lagringsfeil: " + e.message, true);
   }
