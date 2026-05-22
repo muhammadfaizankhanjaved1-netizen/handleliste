@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="nb" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Handleliste">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Handleliste</title>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="header-top">
+    <h1>
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M28 30h8l10 28h22l6-20H36" stroke="var(--accent)" stroke-width="6"
+              stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="46" cy="68" r="5" fill="var(--accent)"/>
+        <circle cx="62" cy="68" r="5" fill="var(--accent)"/>
+      </svg>
+      Handleliste
+    </h1>
+    <div class="header-actions">
+      <button class="btn-icon" onclick="toggleTheme()" title="Bytt tema">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" width="18" height="18">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707
+                   M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>
+        </svg>
+      </button>
+      <button class="btn-icon" onclick="refreshData()" title="Oppdater">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" width="18" height="18">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0
+                   0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div class="totals-bar" id="totals-bar"></div>
+</div>
+
+<!-- ── Filters ── -->
+<div class="filters" id="filter-bar"></div>
+
+<!-- ── Add bar ── -->
+<div class="add-bar">
+  <input id="add-input" class="add-input" type="url" placeholder="Lim inn lenke fra Zalando, XXL, …"
+         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <button class="btn-add" id="btn-add" onclick="handleAdd()">Legg til</button>
+</div>
+
+<!-- ── Main content ── -->
+<div id="main"></div>
+
+<!-- ── Edit modal ── -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>Rediger vare</h3>
+
+    <div class="modal-row">
+      <label>Navn</label>
+      <input type="text" id="edit-name" placeholder="Produktnavn">
+    </div>
+
+    <div class="modal-row">
+      <label>Kategorier</label>
+      <div class="cat-checkboxes" id="cat-checkboxes"></div>
+    </div>
+
+    <div class="modal-row">
+      <label>Måned</label>
+      <select id="edit-month">
+        <option value="">— Ingen —</option>
+        <option>Jan</option><option>Feb</option><option>Mar</option>
+        <option>Apr</option><option>Mai</option><option>Jun</option>
+        <option>Jul</option><option>Aug</option><option>Sep</option>
+        <option>Okt</option><option>Nov</option><option>Des</option>
+      </select>
+    </div>
+
+    <div class="modal-row">
+      <label>Status</label>
+      <select id="edit-status">
+        <option value="ønske">Ønske</option>
+        <option value="sparer_til">Sparer til</option>
+        <option value="bestilt">Bestilt</option>
+        <option value="kjøpt">Kjøpt</option>
+      </select>
+    </div>
+
+    <div class="modal-row">
+      <label>Notater</label>
+      <input type="text" id="edit-notes" placeholder="Valgfritt …">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Avbryt</button>
+      <button class="btn-primary" onclick="saveEdit()">Lagre</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast"></div>
+
+<!-- ── Bottom nav ── -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-wishlist" onclick="setView('wishlist')">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364
+               L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+    </svg>
+    Ønsker
+  </button>
+  <button class="nav-btn" id="nav-months" onclick="setView('months')">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    </svg>
+    Måneder
+  </button>
+  <button class="nav-btn" id="nav-archive" onclick="setView('archive')">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8
+               m-9 4h4"/>
+    </svg>
+    Arkiv
+  </button>
+</nav>
+
+<script src="./app.js"></script>
+<script>
+  // Build category checkboxes
+  document.addEventListener("DOMContentLoaded", () => {
+    const container = document.getElementById("cat-checkboxes");
+    CATEGORIES.forEach(c => {
+      container.innerHTML += `
+        <input class="cat-cb" type="checkbox" id="cb-${c}" value="${c}">
+        <label class="cat-label" for="cb-${c}">${c}</label>`;
+    });
+  });
+
+  function setView(v) {
+    view = v;
+    render();
+  }
+
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("hl-theme", next);
+  }
+
+  async function refreshData() {
+    await load();
+    render();
+    toast("Oppdatert");
+  }
+
+  async function handleAdd() {
+    const inp = document.getElementById("add-input");
+    const btn = document.getElementById("btn-add");
+    const url = inp.value.trim();
+    if (!url) return;
+    btn.disabled = true;
+    btn.textContent = "…";
+    await addItem(url);
+    inp.value = "";
+    btn.disabled = false;
+    btn.textContent = "Legg til";
+  }
+
+  document.getElementById("add-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") handleAdd();
+  });
+</script>
+</body>
+</html>

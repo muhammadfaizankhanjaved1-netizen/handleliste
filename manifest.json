@@ -1,0 +1,19 @@
+{
+  "name": "Handleliste",
+  "short_name": "Handleliste",
+  "description": "Din personlige ønskeliste",
+  "start_url": "/handleliste/",
+  "scope": "/handleliste/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f0f",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "zalando.no": {
+    "price": "span[data-testid*='price'], span[class*='price'], .z-pdp-price",
+    "name": "h1[class*='title'], h1",
+    "image": "meta[property='og:image']"
+  },
+  "boozt.com": {
+    "price": "span.price__final, .price-box .price, [class*='price']",
+    "name": "h1.pdp-title, h1",
+    "image": "meta[property='og:image']"
+  },
+  "xxl.no": {
+    "price": "[data-testid='product-price'], .product-price, [class*='price']",
+    "name": "h1",
+    "image": "meta[property='og:image']"
+  },
+  "power.no": {
+    "price": ".product-price, [class*='price-now'], [class*='current-price']",
+    "name": "h1",
+    "image": "meta[property='og:image']"
+  },
+  "elkjop.no": {
+    "price": "[data-testid='price-wrapper'] span, [class*='price-now'], [class*='current-price']",
+    "name": "h1",
+    "image": "meta[property='og:image']"
+  },
+  "komplett.no": {
+    "price": ".product-price-now, .price, [class*='price']",
+    "name": "h1",
+    "image": "meta[property='og:image']"
+  }
+}
