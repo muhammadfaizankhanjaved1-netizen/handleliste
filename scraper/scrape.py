@@ -37,10 +37,10 @@ def _shopify_scrape(url: str) -> dict | None:
 # ── Zalando API ───────────────────────────────────────────────────────────────
 def _zalando_scrape(url: str) -> dict | None:
     """Henter produkt via Zalando sin offentlige katalog-API."""
-    m = re.search(r"-([A-Z0-9]{2}\d{3}[A-Z0-9][\w-]{0,10})-[A-Z]\d+\.html", url, re.IGNORECASE)
+    m = re.search(r"-([A-Z0-9]{5,15})-[A-Z]\d+\.html", url, re.IGNORECASE)
     if not m:
         # Prøv å finne artikkel-ID på slutten av URL-en
-        m = re.search(r"([a-z0-9]{2}\d{3}[a-z0-9][\w-]{0,10})\.html", url, re.IGNORECASE)
+        m = re.search(r"([A-Z0-9]{5,15})-[A-Z]\d+\.html", url, re.IGNORECASE)
     if not m:
         return None
     article_id = m.group(1).upper()
@@ -101,8 +101,8 @@ def parse_nok_price(text) -> int | None:
     text = text.replace(",-", "").replace(":-", "").strip()
     text = re.sub(r"\s| ", "", text)
     # remove trailing ,00 or .00
-    # fjern desimaldel (.90 / ,90) — norske priser er alltid hele kroner
-    text = re.sub(r"[,.](\d{2})$", "", text)
+    # fjern desimaldel (.90 / ,9000 osv) — norske priser er alltid hele kroner
+    text = re.sub(r"[,.](\d+)$", "", text)
     # fjern tusenskilletegn
     text = re.sub(r"[,.]", "", text)
     text = re.sub(r"[^\d]", "", text)

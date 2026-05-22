@@ -28,5 +28,10 @@
     "price": ".product-price-now, .price, [class*='price']",
     "name": "h1",
     "image": "meta[property='og:image']"
+  },
+  "next.no": {
+    "price": "[data-testid='price'], .product-price, [class*='Price'], [itemprop='price']",
+    "name": "h1[class*='title'], h1",
+    "image": "meta[property='og:image']"
   }
 }
