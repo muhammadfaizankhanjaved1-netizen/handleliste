@@ -1,0 +1,28 @@
+name: Scrape pending items
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # hvert 10. minutt
+  workflow_dispatch:           # manuell kjøring fra GitHub
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Hent kode
+        uses: actions/checkout@v4
+
+      - name: Sett opp Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer avhengigheter
+        run: pip install requests beautifulsoup4 lxml playwright
+
+      - name: Installer Playwright-browser
+        run: playwright install chromium --with-deps
+
+      - name: Kjør scraper
+        run: python scraper/process_queue.py
