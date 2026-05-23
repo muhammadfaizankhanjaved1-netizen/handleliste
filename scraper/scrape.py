@@ -34,6 +34,45 @@ def _shopify_scrape(url: str) -> dict | None:
     except Exception as e:
         return {"error": str(e)}
 
+# ── FINN.no ───────────────────────────────────────────────────────────────────
+def _finn_scrape(url: str) -> dict | None:
+    m = re.search(r"finnkode=(\d+)", url)
+    if not m:
+        return None
+    try:
+        r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=12)
+        soup = BeautifulSoup(r.text, "lxml")
+        name = None
+        og_title = soup.find("meta", property="og:title")
+        if og_title and og_title.get("content"):
+            name = re.sub(r"\s*\|.*$", "", og_title["content"]).strip()
+        if not name:
+            h1 = soup.find("h1")
+            if h1:
+                name = h1.get_text(strip=True)
+        og_img = soup.find("meta", property="og:image")
+        image = og_img["content"] if og_img and og_img.get("content") else None
+        price = None
+        # JSON-LD
+        for tag in soup.find_all("script", type="application/ld+json"):
+            try:
+                d = json.loads(tag.string or "")
+                offers = d.get("offers", {})
+                if isinstance(offers, list):
+                    offers = offers[0]
+                raw = offers.get("price") or offers.get("lowPrice")
+                if raw:
+                    price = parse_nok_price(str(raw))
+                    break
+            except Exception:
+                pass
+        # Fallback: tekst-søk etter pris i HTML
+        if not price:
+            price = _source_price(r.text)
+        return {"name": name, "image": image, "price_current": price, "error": None}
+    except Exception as e:
+        return {"error": str(e)}
+
 # ── Zalando API ───────────────────────────────────────────────────────────────
 def _zalando_scrape(url: str) -> dict | None:
     """Henter produkt via Zalando sin offentlige katalog-API."""
@@ -294,6 +333,14 @@ def scrape(url: str) -> dict:
 
     result = {"name": None, "image": None, "price_current": None,
               "currency": "NOK", "categories": [], "error": None}
+
+    # Step 0: FINN.no
+    if "finn.no" in domain:
+        fr = _finn_scrape(url)
+        if fr and not fr.get("error"):
+            result.update({k: v for k, v in fr.items() if v is not None})
+            result["categories"] = guess_categories(url, result.get("name") or "")
+            return result
 
     # Step 0: Zalando-spesifikk API
     if "zalando." in domain:
