@@ -4,6 +4,7 @@ const BIN_ID  = "6a1007006877513b27b2fcfe";
 const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 const CATEGORIES = ["Skole", "Klær", "Fritid", "Gym", "Jobb"];
 const MONTHS = ["Jan","Feb","Mar","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Des"];
+const CAT_CLS = { "Skole": "skole", "Klær": "klar", "Fritid": "fritid", "Gym": "gym", "Jobb": "jobb" };
 const STATUS_ORDER = ["pending","ønske","sparer_til","bestilt","kjøpt"];
 const STATUS_NEXT = { ønske:"sparer_til", sparer_til:"bestilt", bestilt:"kjøpt" };
 const STATUS_LABELS = { pending:"Henter...", ønske:"Ønske", sparer_til:"Sparer til", bestilt:"Bestilt", kjøpt:"Kjøpt" };
@@ -13,6 +14,7 @@ let data = { categories: CATEGORIES, items: [] };
 let view = "wishlist";   // wishlist | months | archive
 let filters = { cat: null, status: null, month: null };
 let sort = "newest";     // newest | price_asc | price_desc | name
+let calSelectedMonth = null;
 
 // ── JSONBin ──────────────────────────────────────────────────────────────────
 async function load() {
@@ -77,7 +79,7 @@ function cardImg(item) {
 }
 
 function renderCard(item) {
-  const cats = (item.categories || []).map(c => `<span class="badge badge-cat">${c}</span>`).join("");
+  const cats = (item.categories || []).map(c => `<span class="badge badge-cat badge-cat-${CAT_CLS[c] || c.toLowerCase()}">${c}</span>`).join("");
   const drop = priceDrop(item);
   const priceHtml = item.price_current
     ? `<div class="card-price">${fmt(item.price_current)}</div>`
@@ -146,21 +148,51 @@ function renderMonths() {
   MONTHS.forEach(m => { byMonth[m] = []; });
   items.forEach(i => { if (byMonth[i.month]) byMonth[i.month].push(i); });
 
-  const html = MONTHS.map(m => {
+  const calCards = MONTHS.map(m => {
     const list = byMonth[m];
-    if (!list.length) return "";
     const total = list.reduce((s, i) => s + (i.price_current || 0), 0);
-    return `<div class="month-block">
-      <div class="month-header">
-        <span>${m}</span>
-        <span class="month-total">${fmt(total)}</span>
-      </div>
-      <div class="month-grid">${list.map(renderCard).join("")}</div>
+    const hasItems = list.length > 0;
+    const isSelected = calSelectedMonth === m && hasItems;
+
+    const thumbs = list.slice(0, 3).map(i =>
+      i.image
+        ? `<img class="cal-thumb" src="${i.image}" alt="" loading="lazy" onerror="this.style.display='none'">`
+        : `<div class="cal-thumb cal-thumb-letter">${(i.name || "?")[0]}</div>`
+    ).join("");
+
+    return `<div class="cal-card ${hasItems ? "cal-has" : "cal-empty"}${isSelected ? " cal-selected" : ""}"
+      ${hasItems ? `onclick="calSelect('${m}')"` : ""}>
+      <div class="cal-mname">${m}</div>
+      ${hasItems
+        ? `<div class="cal-thumbs">${thumbs}</div>
+           <div class="cal-meta">
+             <span class="cal-count">${list.length}×</span>
+             <span class="cal-total">${fmt(total)}</span>
+           </div>`
+        : `<div class="cal-none">·</div>`}
     </div>`;
   }).join("");
 
-  document.getElementById("main").innerHTML = html ||
-    `<div class="empty"><div class="empty-icon">📅</div><p>Ingen varer med satt måned ennå.</p></div>`;
+  const selectedList = calSelectedMonth ? (byMonth[calSelectedMonth] || []) : [];
+  const detailHtml = selectedList.length
+    ? `<div class="cal-detail">
+        <div class="cal-detail-header">
+          <span>${calSelectedMonth}</span>
+          <span>${fmt(selectedList.reduce((s, i) => s + (i.price_current || 0), 0))}</span>
+        </div>
+        <div class="cal-detail-grid">${selectedList.map(renderCard).join("")}</div>
+      </div>`
+    : "";
+
+  document.getElementById("main").innerHTML = `<div class="cal-wrap">
+    <div class="cal-grid">${calCards}</div>
+    ${detailHtml}
+  </div>`;
+}
+
+function calSelect(m) {
+  calSelectedMonth = calSelectedMonth === m ? null : m;
+  renderMonths();
 }
 
 function renderArchive() {
