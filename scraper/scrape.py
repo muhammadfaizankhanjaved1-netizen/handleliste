@@ -71,6 +71,28 @@ def _zalando_scrape(url: str) -> dict | None:
         return {"error": str(e)}
 
 SELECTORS_FILE = Path(__file__).parent.parent / "selectors.json"
+
+
+def search_image(name: str) -> str | None:
+    """Soker etter produktbilde via Bing Images som siste utvei."""
+    try:
+        from urllib.parse import quote_plus
+        q = quote_plus(f"{name} product")
+        r = requests.get(
+            f"https://www.bing.com/images/search?q={q}&form=HDRSC2&first=1",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
+                     "Accept-Language": "en-US,en;q=0.9"},
+            timeout=10,
+        )
+        # Bing embed product images as murl in JSON attributes
+        for m in re.finditer(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', r.text):
+            url = m.group(1)
+            if any(skip in url for skip in ["bing.com", "microsoft.com"]):
+                continue
+            return url
+    except Exception:
+        pass
+    return None
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
@@ -333,6 +355,11 @@ def scrape(url: str) -> dict:
             result["error"] = f"Playwright feil: {e}"
 
     result["categories"] = guess_categories(url, result["name"] or "")
+
+    # Step 3: DuckDuckGo image search fallback hvis bilde mangler
+    if not result["image"] and result["name"]:
+        result["image"] = search_image(result["name"])
+
     return result
 
 
