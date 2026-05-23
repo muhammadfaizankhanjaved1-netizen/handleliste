@@ -326,7 +326,23 @@ def guess_categories(url: str, name: str = "") -> list[str]:
     return cats[:2] if cats else ["Klær"]
 
 
+_TRACKING_PARAMS = {
+    "cq_src","cq_cmp","cq_con","cq_term","cq_med","cq_plac","cq_net","cq_pos","cq_plt",
+    "gad_source","gad_campaignid","gbraid","wbraid","gclid","fbclid","msclkid",
+    "utm_source","utm_medium","utm_campaign","utm_term","utm_content",
+    "st","volume",
+}
+
+def _clean_url(url: str) -> str:
+    from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
+    p = urlparse(url)
+    qs = {k: v for k, v in parse_qs(p.query, keep_blank_values=False).items()
+          if k.lower() not in _TRACKING_PARAMS}
+    cleaned = urlunparse(p._replace(query=urlencode(qs, doseq=True)))
+    return cleaned
+
 def scrape(url: str) -> dict:
+    url = _clean_url(url)
     domain = get_domain(url)
     rate_limit(domain)
     selectors = load_selectors().get(domain, {})
