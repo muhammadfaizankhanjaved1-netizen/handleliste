@@ -1,0 +1,9 @@
+.git/
+.wrangler/
+scraper/
+requirements.txt
+*.py
+*.ps1
+*.bat
+wrangler.jsonc
+node_modules/
