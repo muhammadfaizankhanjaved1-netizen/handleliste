@@ -324,6 +324,16 @@ function openEdit(id) {
   document.getElementById("edit-month").value  = item.month || "";
   document.getElementById("edit-notes").value  = item.notes || "";
   document.getElementById("edit-status").value = item.status;
+  const imgInput = document.getElementById("edit-image");
+  const imgPreview = document.getElementById("edit-image-preview");
+  imgInput.value = item.image || "";
+  if (item.image) { imgPreview.src = item.image; imgPreview.style.display = "block"; }
+  else imgPreview.style.display = "none";
+  imgInput.oninput = () => {
+    const v = imgInput.value.trim();
+    if (v.startsWith("http")) { imgPreview.src = v; imgPreview.style.display = "block"; }
+    else imgPreview.style.display = "none";
+  };
 
   CATEGORIES.forEach(c => {
     const cb = document.getElementById("cb-" + c);
@@ -345,6 +355,9 @@ async function saveEdit() {
   item.month  = document.getElementById("edit-month").value || null;
   item.notes  = document.getElementById("edit-notes").value.trim();
   item.status = document.getElementById("edit-status").value;
+  const newImg = document.getElementById("edit-image").value.trim();
+  if (newImg && newImg.startsWith("http")) item.image = newImg;
+  else if (!newImg) item.image = null;
   const newPrice = parseInt(document.getElementById("edit-price").value, 10);
   if (newPrice && newPrice !== item.price_current) {
     item.price_current = newPrice;
