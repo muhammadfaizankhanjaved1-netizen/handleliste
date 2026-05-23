@@ -87,8 +87,7 @@ function renderCard(item) {
     <div class="card-actions">
       ${STATUS_NEXT[item.status] ? `<button onclick="nextStatus('${item.id}')">→ ${STATUS_LABELS[STATUS_NEXT[item.status]]}</button>` : ""}
       <button onclick="openEdit('${item.id}')">Rediger</button>
-      <a class="btn-finn" href="https://www.finn.no/bap/forsale/search.html?q=${encodeURIComponent(item.name || '')}" target="_blank" rel="noopener">FINN</a>
-      <button class="btn-delete" onclick="deleteItem('${item.id}')">✕</button>
+<button class="btn-delete" onclick="deleteItem('${item.id}')">✕</button>
     </div>` : `
     <div class="card-actions">
       <button class="btn-delete" onclick="deleteItem('${item.id}')">Avbryt</button>
