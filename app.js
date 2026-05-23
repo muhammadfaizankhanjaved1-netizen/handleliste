@@ -411,6 +411,7 @@ async function boot() {
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.addEventListener("controllerchange", () => window.location.reload());
   }
 
   await load();
