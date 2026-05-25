@@ -14,7 +14,11 @@ LOG = lambda msg: print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=
 
 def main():
     LOG("Leser wishlist fra JSONBin...")
-    data = client.read()
+    try:
+        data = client.read()
+    except Exception as e:
+        LOG(f"JSONBin utilgjengelig: {e}")
+        return
     pending = [i for i in data["items"] if i.get("status") == "pending"]
 
     if not pending:
@@ -50,8 +54,12 @@ def main():
 
     if changed:
         LOG("Lagrer til JSONBin...")
-        client.write(data)
-        LOG("Ferdig.")
+        try:
+            client.write(data)
+            LOG("Ferdig.")
+        except Exception as e:
+            LOG(f"Lagring feilet: {e}")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
