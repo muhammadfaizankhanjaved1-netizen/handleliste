@@ -1,8 +1,6 @@
 name: Hent nye varer
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:

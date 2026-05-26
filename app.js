@@ -17,6 +17,15 @@ let sort = "newest";     // newest | price_asc | price_desc | name
 let calSelectedMonth = null;
 
 // ── JSONBin ──────────────────────────────────────────────────────────────────
+const CACHE_KEY = "hl-data-cache";
+
+function saveCache(d) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch {}
+}
+function loadCache() {
+  try { const s = localStorage.getItem(CACHE_KEY); return s ? JSON.parse(s) : null; } catch { return null; }
+}
+
 async function load() {
   try {
     const r = await fetch(`${BIN_URL}/latest`, { headers: { "X-Master-Key": BIN_KEY } });
@@ -24,8 +33,19 @@ async function load() {
     const j = await r.json();
     data = j.record;
     if (!data.items) data.items = [];
+    saveCache(data);
+    const offlineBanner = document.getElementById("offline-banner");
+    if (offlineBanner) offlineBanner.style.display = "none";
   } catch (e) {
-    toast("Kan ikke laste data: " + e.message, true);
+    const cached = loadCache();
+    if (cached) {
+      data = cached;
+      if (!data.items) data.items = [];
+      const offlineBanner = document.getElementById("offline-banner");
+      if (offlineBanner) offlineBanner.style.display = "block";
+    } else {
+      toast("Kan ikke laste data: " + e.message, true);
+    }
   }
 }
 async function save() {
@@ -34,6 +54,7 @@ async function save() {
     headers: { "X-Master-Key": BIN_KEY, "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+  saveCache(data);
 }
 
 // ── UUID ─────────────────────────────────────────────────────────────────────
