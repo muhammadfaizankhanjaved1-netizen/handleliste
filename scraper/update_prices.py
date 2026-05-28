@@ -3,7 +3,11 @@ Oppdaterer priser på alle aktive varer (ikke 'kjøpt').
 Kjøres av Task Scheduler annenhver dag kl. 07:00.
 """
 import sys
+import io
 from datetime import datetime, timezone
+
+# Force UTF-8 output so Unicode chars don't crash on Windows cp1252 terminals
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 import jsonbin_client as client
@@ -38,9 +42,9 @@ def main():
                 history.append({"date": today, "price": new_price})
                 item["price_history"] = history
                 item["last_error"] = None
-                direction = "↓" if (old and new_price < old) else "↑"
-                LOG(f"    Pris oppdatert: {old} → {new_price} kr {direction}")
-                changed = True
+                changed = True  # sett FØR LOG så prisen lagres selv om print feiler
+                direction = "ned" if (old and new_price < old) else "opp"
+                LOG(f"    Pris oppdatert: {old} -> {new_price} kr ({direction})")
             elif new_price:
                 LOG(f"    Ingen endring: {new_price} kr")
             else:

@@ -33,5 +33,35 @@
     "price": "[data-testid='price'], .product-price, [class*='Price'], [itemprop='price']",
     "name": "h1[class*='title'], h1",
     "image": "meta[property='og:image']"
+  },
+  "autodude.no": {
+    "price": "[class*='price'], [itemprop='price'], .product-price",
+    "name": "h1",
+    "image": "meta[property='og:image']"
+  },
+  "clasohlson.com": {
+    "price": "[class*='price'], [data-testid*='price'], [itemprop='price']",
+    "name": "h1",
+    "image": "meta[property='og:image']"
+  },
+  "nlyman.com": {
+    "price": "[class*='price'], [itemprop='price'], .woocommerce-Price-amount",
+    "name": "h1",
+    "image": "meta[property='og:image']"
+  },
+  "teknikkdeler.no": {
+    "price": "[class*='price'], [itemprop='price'], .product-price",
+    "name": "h1",
+    "image": "meta[property='og:image']"
+  },
+  "proteinfabrikken.no": {
+    "price": "[class*='price'], [itemprop='price'], .product-price",
+    "name": "h1",
+    "image": "meta[property='og:image']"
+  },
+  "extremefitness.no": {
+    "price": "[class*='price'], [itemprop='price'], .price",
+    "name": "h1",
+    "image": "meta[property='og:image']"
   }
 }

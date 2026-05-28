@@ -12,7 +12,6 @@ def _shopify_scrape(url: str) -> dict | None:
     """Henter produkt via Shopify sitt eget JSON-endepunkt — ingen blokkering."""
     parsed = urlparse(url)
     path = parsed.path.rstrip("/")
-    # Ekstraher product handle fra URL
     m = re.search(r"/products/([^/?#]+)", path)
     if not m:
         return None
@@ -30,7 +29,19 @@ def _shopify_scrape(url: str) -> dict | None:
         image = (p.get("images") or [{}])[0].get("src")
         price_raw = (p.get("variants") or [{}])[0].get("price")
         price = parse_nok_price(str(price_raw)) if price_raw else None
-        return {"name": name, "image": image, "price_current": price, "error": None}
+
+        # Hent valuta fra produktsiden sin og:meta (mer pålitelig enn shop.json)
+        currency = "NOK"
+        try:
+            page_r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=8)
+            page_r.encoding = "utf-8"
+            page_og = _og_meta(BeautifulSoup(page_r.text, "lxml"))
+            currency = (page_og.get("currency") or "NOK").upper()
+        except Exception:
+            pass
+        price = _to_nok(price, currency)
+
+        return {"name": name, "image": image, "price_current": price, "currency": currency, "error": None}
     except Exception as e:
         return {"error": str(e)}
 
@@ -137,6 +148,26 @@ USER_AGENT = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 )
 _domain_last_request: dict[str, float] = {}
+
+# Approximate exchange rates to NOK — refresh manually when significantly off
+EXCHANGE_RATES = {
+    "EUR": 11.5,
+    "USD": 10.5,
+    "GBP": 13.5,
+    "SEK": 0.97,
+    "DKK": 1.5,
+    "CHF": 12.0,
+    "NOK": 1.0,
+}
+
+def _to_nok(price: int | None, currency: str | None) -> int | None:
+    """Konverterer pris fra fremmed valuta til NOK. Returnerer None hvis pris mangler."""
+    if not price:
+        return None
+    rate = EXCHANGE_RATES.get((currency or "NOK").upper(), None)
+    if rate and rate != 1.0:
+        return round(price * rate)
+    return price
 
 
 def get_domain(url: str) -> str:
@@ -374,9 +405,13 @@ def scrape(url: str) -> dict:
             result["categories"] = guess_categories(url, result.get("name") or "")
             return result
 
+    _ERROR_INDICATORS = {"oops", "404", "not found", "fant ikke", "siden finnes ikke", "page not found"}
+
     # Step 1: og:meta + JSON-LD + source regex via requests
     try:
         resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=12)
+        # Force UTF-8 so sites that mis-declare charset don't double-encode æøå
+        resp.encoding = "utf-8"
         soup = BeautifulSoup(resp.text, "lxml")
         og = _og_meta(soup)
         ld = _json_ld(soup)
@@ -389,14 +424,19 @@ def scrape(url: str) -> dict:
                 parts = [p.strip() for p in raw_name.split(" - ")]
                 if parts[0] == parts[-1] or (len(parts) >= 3 and parts[0] == parts[2]):
                     raw_name = parts[0]
+            # Detect error/bot-block pages — discard so Playwright fallback runs
+            if any(kw in raw_name.lower() for kw in _ERROR_INDICATORS):
+                raw_name = None
+                og["image"] = None
         result["name"]     = raw_name
         result["image"]    = og["image"] or ld["image"]
-        result["currency"] = og["currency"] or "NOK"
+        currency = (og["currency"] or "NOK").upper()
+        result["currency"] = currency
         price = (parse_nok_price(og["price_raw"])
                  or parse_nok_price(ld["price_raw"])
                  or _source_price(resp.text))
         if price:
-            result["price_current"] = price
+            result["price_current"] = _to_nok(price, currency)
     except Exception as e:
         result["error"] = f"og:meta feil: {e}"
 
@@ -428,19 +468,49 @@ def scrape(url: str) -> dict:
 
 def scrape_price_only(url: str) -> int | None:
     domain = get_domain(url)
+
+    # --- Spesialiserte fast-paths ---
+    if "zalando." in domain:
+        zr = _zalando_scrape(url)
+        if zr and zr.get("price_current"):
+            return zr["price_current"]
+        return None
+
+    if "finn.no" in domain:
+        fr = _finn_scrape(url)
+        if fr and fr.get("price_current"):
+            return fr["price_current"]
+        return None
+
+    if re.search(r"/products/", url):
+        sr = _shopify_scrape(url)
+        if sr and sr.get("price_current"):
+            return sr["price_current"]
+
     rate_limit(domain)
     selectors = load_selectors().get(domain, {})
 
+    # --- requests + og:meta + JSON-LD + source regex ---
     try:
         resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=12)
+        resp.encoding = "utf-8"
         soup = BeautifulSoup(resp.text, "lxml")
         og = _og_meta(soup)
+        currency = (og.get("currency") or "NOK").upper()
         price = parse_nok_price(og["price_raw"])
         if price:
-            return price
+            return _to_nok(price, currency)
+        ld = _json_ld(soup)
+        price = parse_nok_price(ld["price_raw"])
+        if price:
+            return _to_nok(price, currency)
+        price = _source_price(resp.text)
+        if price:
+            return _to_nok(price, currency)
     except Exception:
         pass
 
+    # --- Playwright fallback med selectors ---
     if price_sel := selectors.get("price"):
         try:
             from playwright.sync_api import sync_playwright
