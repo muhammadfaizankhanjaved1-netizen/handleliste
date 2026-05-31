@@ -74,6 +74,17 @@
 <!-- ── Main content ── -->
 <div id="main"></div>
 
+<!-- ── Purchase plan panel ── -->
+<div class="modal-overlay" id="plan-overlay" onclick="if(event.target===this)closePurchasePlan()">
+  <div class="modal plan-modal">
+    <div class="plan-header">
+      <h3>Planlagte kjøp</h3>
+      <span id="plan-total"></span>
+    </div>
+    <div id="plan-list"></div>
+  </div>
+</div>
+
 <!-- ── Edit modal ── -->
 <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal">

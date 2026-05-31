@@ -175,7 +175,7 @@ function renderNextPurchase() {
   const imgHtml = next.image
     ? `<img src="${next.image}" alt="" onerror="this.style.display='none'">`
     : `<span>${(next.name || "?")[0].toUpperCase()}</span>`;
-  bar.innerHTML = `<div class="next-purchase" onclick="openEdit('${next.id}')">
+  bar.innerHTML = `<div class="next-purchase" onclick="openPurchasePlan()">
     <div class="next-img">${imgHtml}</div>
     <div class="next-info">
       <div class="next-label">⏳ Neste kjøp — ${next.month}</div>
@@ -453,6 +453,54 @@ async function deleteItem(id) {
   render();
   await save();
   toast("Slettet");
+}
+
+// ── Purchase plan panel ───────────────────────────────────────────────────────
+function openPurchasePlan() {
+  const candidates = activeItems().filter(i => i.month && i.status !== "pending");
+  const sorted = candidates.slice().sort((a, b) => MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month));
+  const total = sorted.reduce((s, i) => s + (i.price_current || 0), 0);
+
+  const byMonth = {};
+  sorted.forEach(i => {
+    if (!byMonth[i.month]) byMonth[i.month] = [];
+    byMonth[i.month].push(i);
+  });
+
+  let html = "";
+  Object.keys(byMonth).forEach(m => {
+    const list = byMonth[m];
+    const mTotal = list.reduce((s, i) => s + (i.price_current || 0), 0);
+    html += `<div class="plan-month-header">
+      <span>📅 ${m}</span>
+      <span class="plan-month-total">${mTotal ? fmt(mTotal) : ""}</span>
+    </div>`;
+    list.forEach(item => {
+      const imgHtml = item.image
+        ? `<img src="${item.image}" alt="" onerror="this.parentNode.innerHTML='<span>${(item.name||"?")[0]}</span>'">`
+        : `<span>${(item.name || "?")[0].toUpperCase()}</span>`;
+      const statusDot = item.status !== "ønske"
+        ? `<span class="plan-dot sd-${item.status === "sparer_til" ? "sparer" : item.status}"></span>`
+        : "";
+      html += `<div class="plan-item" onclick="closePurchasePlan();openEdit('${item.id}')">
+        <div class="plan-thumb">${imgHtml}</div>
+        <div class="plan-info">
+          <div class="plan-name">${item.name || item.url}</div>
+          <div class="plan-meta">${statusDot}${STATUS_LABELS[item.status] || item.status}</div>
+        </div>
+        <div class="plan-price">${item.price_current ? fmt(item.price_current) : "—"}</div>
+      </div>`;
+    });
+  });
+
+  document.getElementById("plan-total").textContent = total ? `Totalt: ${fmt(total)}` : "";
+  document.getElementById("plan-list").innerHTML = html ||
+    `<div style="text-align:center;padding:40px;color:var(--subtext)">Ingen planlagte kjøp</div>`;
+  document.getElementById("plan-overlay").classList.add("open");
+}
+
+function closePurchasePlan() {
+  document.getElementById("plan-overlay").classList.remove("open");
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────────

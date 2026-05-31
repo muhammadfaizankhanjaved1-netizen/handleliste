@@ -575,6 +575,43 @@ body {
   border-radius: 10px; padding: 12px 20px; font-size: .9rem; font-weight: 600; cursor: pointer;
 }
 
+/* ── PLAN PANEL ── */
+.plan-modal { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+.plan-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px;
+}
+.plan-header h3 { margin-bottom: 0; }
+#plan-total { color: var(--accent); font-weight: 800; font-size: .88rem; }
+.plan-month-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 0 6px;
+  border-top: 1px solid var(--border);
+  font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--subtext);
+}
+.plan-month-header:first-of-type { border-top: none; padding-top: 0; }
+.plan-month-total { color: var(--accent); }
+.plan-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: opacity .15s;
+}
+.plan-item:last-child { border-bottom: none; }
+.plan-item:active { opacity: .7; }
+.plan-thumb {
+  width: 50px; height: 50px; border-radius: 10px; flex-shrink: 0;
+  background: var(--border); display: flex; align-items: center; justify-content: center;
+  overflow: hidden; font-size: 1.3rem; font-weight: 800; color: var(--subtext);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.plan-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.plan-info { flex: 1; min-width: 0; }
+.plan-name { font-size: .85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.plan-meta { font-size: .7rem; color: var(--subtext); display: flex; align-items: center; gap: 5px; }
+.plan-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.plan-price { font-size: .92rem; font-weight: 800; color: var(--accent); flex-shrink: 0; }
+
 /* ── TOAST ── */
 .toast {
   position: fixed; bottom: 90px; left: 50%;
