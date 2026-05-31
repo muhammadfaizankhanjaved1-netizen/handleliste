@@ -12,8 +12,8 @@
   --danger:    #ef4444;
   --radius:    16px;
   --shadow:    0 4px 24px rgba(0,0,0,.7);
-  --ring:      rgba(255,255,255,0.08);
-  --ring-hover:rgba(255,255,255,0.22);
+  --ring:      rgba(255,255,255,0.75);
+  --ring-hover:rgba(255,255,255,1);
 }
 [data-theme="light"] {
   --bg:     #f4f4f8;
@@ -354,7 +354,7 @@ body {
   overflow: visible;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 0 0 1.5px var(--ring), var(--shadow);
+  box-shadow: 0 0 0 2px var(--ring), var(--shadow);
   transition: transform .2s cubic-bezier(.34,1.4,.64,1), box-shadow .2s;
   position: relative;
   clip-path: none;
@@ -364,7 +364,7 @@ body {
 .card > a:first-child { border-radius: var(--radius) var(--radius) 0 0; overflow: hidden; }
 .card:hover {
   transform: translateY(-4px) scale(1.012);
-  box-shadow: 0 0 0 2px var(--ring-hover), 0 16px 48px rgba(0,0,0,.8);
+  box-shadow: 0 0 0 2.5px var(--ring-hover), 0 16px 48px rgba(0,0,0,.8);
 }
 
 /* Image wrap */
