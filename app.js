@@ -280,15 +280,11 @@ function renderFilters() {
   const catBtns = CATEGORIES.map(c =>
     `<button class="filter-btn ${filters.cat === c ? "active" : ""}" onclick="toggleFilter('cat','${c}')">${c}</button>`
   ).join("");
-  const monthBtns = MONTHS.map(m =>
-    `<button class="filter-btn ${filters.month === m ? "active" : ""}" onclick="toggleFilter('month','${m}')">${m}</button>`
-  ).join("");
-
   bar.innerHTML = `
     <span class="filter-sep">Sorter:</span>${sortBtns}
     <span class="filter-sep">Filter:</span>
-    <button class="filter-btn ${!filters.cat && !filters.status && !filters.month ? "active" : ""}" onclick="clearFilters()">Alle</button>
-    ${statusBtns}${catBtns}${monthBtns}`;
+    <button class="filter-btn ${!filters.cat && !filters.status ? "active" : ""}" onclick="clearFilters()">Alle</button>
+    ${statusBtns}${catBtns}`;
 }
 
 function toggleFilter(key, val) {
