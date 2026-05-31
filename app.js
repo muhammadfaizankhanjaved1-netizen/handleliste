@@ -110,7 +110,7 @@ function renderCard(item) {
   const monthHtml = item.month
     ? `<div class="card-month">📅 ${item.month}</div>` : "";
 
-  const statusBadge = item.status !== "kjøpt" ? `
+  const statusBadge = (item.status !== "kjøpt" && item.status !== "ønske") ? `
     <div class="status-badge">
       ${item.status !== "pending" ? `<span class="status-dot-sm sd-${item.status === "sparer_til" ? "sparer" : item.status}"></span>` : ""}
       ${STATUS_ICONS[item.status] || ""} ${item.status !== "pending" ? STATUS_LABELS[item.status] : "Henter…"}

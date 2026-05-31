@@ -315,7 +315,7 @@ body {
 .add-price-input { max-width: 110px; flex: none; }
 
 /* ── SECTION HEADERS ── */
-.section { margin-bottom: 4px; }
+.section { margin-bottom: 10px; }
 .section-header {
   display: flex;
   align-items: center;
@@ -343,8 +343,8 @@ body {
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  padding: 0 16px 8px;
+  gap: 14px;
+  padding: 0 16px 14px;
 }
 
 /* ── CARD ── */
