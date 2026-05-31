@@ -165,23 +165,25 @@ function filteredItems() {
 }
 
 function renderNextPurchase() {
+  const bar = document.getElementById("next-purchase-bar");
+  if (!bar) return;
+  if (view !== "wishlist") { bar.innerHTML = ""; return; }
   const candidates = activeItems().filter(i => i.month && i.status !== "pending" && i.price_current);
-  if (!candidates.length) return "";
+  if (!candidates.length) { bar.innerHTML = ""; return; }
   const sorted = candidates.slice().sort((a, b) => MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month));
   const next = sorted[0];
   const imgHtml = next.image
     ? `<img src="${next.image}" alt="" onerror="this.style.display='none'">`
     : `<span>${(next.name || "?")[0].toUpperCase()}</span>`;
-  return `<div class="next-purchase" onclick="openEdit('${next.id}')">
+  bar.innerHTML = `<div class="next-purchase" onclick="openEdit('${next.id}')">
     <div class="next-img">${imgHtml}</div>
     <div class="next-info">
       <div class="next-label">⏳ Neste kjøp — ${next.month}</div>
       <div class="next-name">${next.name || next.url}</div>
-      <div class="next-month">${STATUS_LABELS[next.status] || next.status}</div>
+      <div class="next-month">${STATUS_LABELS[next.status] || next.status} · ${(next.categories || []).join(" · ")}</div>
     </div>
     <div class="next-price-col">
       <div class="next-price">${fmt(next.price_current)}</div>
-      <div class="next-sub">${(next.categories || []).join(" · ") || ""}</div>
     </div>
   </div>`;
 }
@@ -203,7 +205,7 @@ function renderWishlist() {
   }
 
   // Grouped by category with section headers + totals
-  let html = renderNextPurchase();
+  let html = "";
   const shown = new Set();
 
   CATEGORIES.forEach(cat => {
@@ -393,6 +395,7 @@ function setSearch(q) {
 
 function render() {
   renderTotals();
+  renderNextPurchase();
   renderFilters();
   if (view === "wishlist") renderWishlist();
   else if (view === "months") renderMonths();
