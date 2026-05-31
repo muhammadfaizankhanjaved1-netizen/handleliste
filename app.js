@@ -5,15 +5,18 @@ const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 const CATEGORIES = ["Skole", "Klær", "Fritid", "Gym", "Jobb"];
 const MONTHS = ["Jan","Feb","Mar","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Des"];
 const CAT_CLS = { "Skole": "skole", "Klær": "klar", "Fritid": "fritid", "Gym": "gym", "Jobb": "jobb" };
+const CAT_ICONS = { "Skole": "🎓", "Klær": "👕", "Fritid": "🎮", "Gym": "🏋️", "Jobb": "💼" };
 const STATUS_ORDER = ["pending","ønske","sparer_til","bestilt","kjøpt"];
 const STATUS_NEXT = { ønske:"sparer_til", sparer_til:"bestilt", bestilt:"kjøpt" };
 const STATUS_LABELS = { pending:"Henter...", ønske:"Ønske", sparer_til:"Sparer til", bestilt:"Bestilt", kjøpt:"Kjøpt" };
+const STATUS_ICONS  = { pending:"⏳", ønske:"♡", sparer_til:"💰", bestilt:"📦", kjøpt:"✓" };
 
 // ── State ────────────────────────────────────────────────────────────────────
 let data = { categories: CATEGORIES, items: [] };
-let view = "wishlist";   // wishlist | months | archive
+let view = "wishlist";
 let filters = { cat: null, status: null, month: null };
-let sort = "newest";     // newest | price_asc | price_desc | name
+let sort = "newest";
+let searchQuery = "";
 let calSelectedMonth = null;
 
 // ── JSONBin ──────────────────────────────────────────────────────────────────
@@ -87,30 +90,39 @@ function priceDrop(item) {
 function cardImg(item) {
   if (item.status === "pending") {
     const domain = (() => { try { return new URL(item.url).hostname.replace("www.",""); } catch { return "?"; } })();
-    return `<div class="card-img">
+    return `<div class="card-img-wrap">
       <div class="placeholder">${domain[0].toUpperCase()}</div>
       <div class="pending-overlay"><div class="spinner"></div> Henter...</div>
     </div>`;
   }
   if (item.image) {
-    return `<div class="card-img"><img src="${item.image}" alt="" loading="lazy" onerror="this.parentNode.innerHTML='<div class=placeholder>?</div>'"></div>`;
+    return `<div class="card-img-wrap"><img src="${item.image}" alt="" loading="lazy" onerror="this.parentNode.innerHTML='<div class=placeholder>?</div>'"></div>`;
   }
   const domain = (() => { try { return new URL(item.url).hostname.replace("www.",""); } catch { return "?"; } })();
-  return `<div class="card-img"><div class="placeholder">${domain[0].toUpperCase()}</div></div>`;
+  return `<div class="card-img-wrap"><div class="placeholder">${domain[0].toUpperCase()}</div></div>`;
 }
 
 function renderCard(item) {
-  const cats = (item.categories || []).map(c => `<span class="badge badge-cat badge-cat-${CAT_CLS[c] || c.toLowerCase()}">${c}</span>`).join("");
   const drop = priceDrop(item);
   const priceHtml = item.price_current
     ? `<div class="card-price">${fmt(item.price_current)}</div>`
     : `<div class="card-price no-price">${item.status === "pending" ? "—" : item.utsolgt ? "Utsolgt" : "Ingen pris"}</div>`;
+  const monthHtml = item.month
+    ? `<div class="card-month">📅 ${item.month}</div>` : "";
+
+  const statusBadge = item.status !== "kjøpt" ? `
+    <div class="status-badge">
+      ${item.status !== "pending" ? `<span class="status-dot-sm sd-${item.status === "sparer_til" ? "sparer" : item.status}"></span>` : ""}
+      ${STATUS_ICONS[item.status] || ""} ${item.status !== "pending" ? STATUS_LABELS[item.status] : "Henter…"}
+    </div>` : "";
+
+  const imgHtml = cardImg(item);
 
   const actionBtns = item.status !== "pending" ? `
     <div class="card-actions">
       ${STATUS_NEXT[item.status] ? `<button onclick="nextStatus('${item.id}')">→ ${STATUS_LABELS[STATUS_NEXT[item.status]]}</button>` : ""}
       <button onclick="openEdit('${item.id}')">Rediger</button>
-<button class="btn-delete" onclick="deleteItem('${item.id}')">✕</button>
+      <button class="btn-delete" onclick="deleteItem('${item.id}')">✕</button>
     </div>` : `
     <div class="card-actions">
       <button class="btn-delete" onclick="deleteItem('${item.id}')">Avbryt</button>
@@ -118,16 +130,14 @@ function renderCard(item) {
 
   return `<div class="card" data-id="${item.id}">
     ${drop ? '<div class="price-drop">↓ Prisfall</div>' : ""}
+    ${statusBadge}
     <a href="${item.url}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
-      ${cardImg(item)}
+      ${imgHtml}
     </a>
     <div class="card-body">
       <div class="card-name">${item.name || item.url}</div>
       ${priceHtml}
-      <div class="badges">
-        <span class="badge badge-${item.status}">${STATUS_LABELS[item.status] || item.status}</span>
-        ${cats}
-      </div>
+      ${monthHtml}
     </div>
     ${actionBtns}
   </div>`;
@@ -138,10 +148,12 @@ function activeItems() {
   return data.items.filter(i => i.status !== "kjøpt");
 }
 function filteredItems() {
+  const q = searchQuery.trim().toLowerCase();
   const items = activeItems().filter(i => {
     if (filters.cat && !(i.categories || []).includes(filters.cat)) return false;
     if (filters.status && i.status !== filters.status) return false;
     if (filters.month && i.month !== filters.month) return false;
+    if (q && !((i.name || "") + (i.url || "") + (i.notes || "")).toLowerCase().includes(q)) return false;
     return true;
   });
   return items.sort((a, b) => {
@@ -152,15 +164,75 @@ function filteredItems() {
   });
 }
 
+function renderNextPurchase() {
+  const candidates = activeItems().filter(i => i.month && i.status !== "pending" && i.price_current);
+  if (!candidates.length) return "";
+  const sorted = candidates.slice().sort((a, b) => MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month));
+  const next = sorted[0];
+  const imgHtml = next.image
+    ? `<img src="${next.image}" alt="" onerror="this.style.display='none'">`
+    : `<span>${(next.name || "?")[0].toUpperCase()}</span>`;
+  return `<div class="next-purchase" onclick="openEdit('${next.id}')">
+    <div class="next-img">${imgHtml}</div>
+    <div class="next-info">
+      <div class="next-label">⏳ Neste kjøp — ${next.month}</div>
+      <div class="next-name">${next.name || next.url}</div>
+      <div class="next-month">${STATUS_LABELS[next.status] || next.status}</div>
+    </div>
+    <div class="next-price-col">
+      <div class="next-price">${fmt(next.price_current)}</div>
+      <div class="next-sub">${(next.categories || []).join(" · ") || ""}</div>
+    </div>
+  </div>`;
+}
+
 function renderWishlist() {
   const items = filteredItems();
   const main = document.getElementById("main");
+  const isFiltered = filters.cat || filters.status || searchQuery.trim();
+
   if (!items.length) {
     main.innerHTML = `<div class="empty"><div class="empty-icon">🛒</div>
       <p>Ingen varer her ennå.<br>Lim inn en lenke øverst for å legge til.</p></div>`;
     return;
   }
-  main.innerHTML = `<div class="grid">${items.map(renderCard).join("")}</div>`;
+
+  if (isFiltered) {
+    main.innerHTML = `<div class="grid">${items.map(renderCard).join("")}</div>`;
+    return;
+  }
+
+  // Grouped by category with section headers + totals
+  let html = renderNextPurchase();
+  const shown = new Set();
+
+  CATEGORIES.forEach(cat => {
+    const catItems = items.filter(i => (i.categories || []).includes(cat));
+    if (!catItems.length) return;
+    catItems.forEach(i => shown.add(i.id));
+    const total = catItems.reduce((s, i) => s + (i.price_current || 0), 0);
+    html += `<div class="section">
+      <div class="section-header">
+        <div class="section-title"><span class="section-title-icon">${CAT_ICONS[cat]}</span>${cat}</div>
+        ${total ? `<div class="section-total">${fmt(total)}</div>` : ""}
+      </div>
+      <div class="grid">${catItems.map(renderCard).join("")}</div>
+    </div>`;
+  });
+
+  const rest = items.filter(i => !shown.has(i.id));
+  if (rest.length) {
+    const total = rest.reduce((s, i) => s + (i.price_current || 0), 0);
+    html += `<div class="section">
+      <div class="section-header">
+        <div class="section-title"><span class="section-title-icon">📦</span>Andre</div>
+        ${total ? `<div class="section-total">${fmt(total)}</div>` : ""}
+      </div>
+      <div class="grid">${rest.map(renderCard).join("")}</div>
+    </div>`;
+  }
+
+  main.innerHTML = html;
 }
 
 function renderMonths() {
@@ -266,38 +338,57 @@ function renderTotals() {
 
 function renderFilters() {
   const bar = document.getElementById("filter-bar");
-  const sortBtns = [
-    { key: "newest",     label: "Nyeste" },
-    { key: "price_asc",  label: "Billigst" },
-    { key: "price_desc", label: "Dyreste" },
-    { key: "name",       label: "Navn A–Å" },
-  ].map(s =>
-    `<button class="filter-btn sort-btn ${sort === s.key ? "active" : ""}" onclick="setSort('${s.key}')">${s.label}</button>`
-  ).join("");
-  const statusBtns = STATUS_ORDER.filter(s => s !== "kjøpt").map(s =>
-    `<button class="filter-btn ${filters.status === s ? "active" : ""}" onclick="toggleFilter('status','${s}')">${STATUS_LABELS[s]}</button>`
-  ).join("");
-  const catBtns = CATEGORIES.map(c =>
-    `<button class="filter-btn ${filters.cat === c ? "active" : ""}" onclick="toggleFilter('cat','${c}')">${c}</button>`
-  ).join("");
+
+  const catTabs = [{ key: null, icon: "✨", label: "Alle" }, ...CATEGORIES.map(c => ({ key: c, icon: CAT_ICONS[c], label: c }))]
+    .map(t => `<button class="cat-tab ${filters.cat === t.key ? "active" : ""}" onclick="toggleCat(${t.key ? `'${t.key}'` : 'null'})">
+      <span class="cat-tab-icon">${t.icon}</span>${t.label}
+    </button>`).join("");
+
+  const statusPills = [
+    { key: null,        cls: "pill-all",     label: "Alle" },
+    { key: "ønske",     cls: "pill-ønske",   label: "Ønsker" },
+    { key: "sparer_til",cls: "pill-sparer",  label: "Sparer til" },
+    { key: "bestilt",   cls: "pill-bestilt", label: "Bestilt" },
+  ].map(p => `<button class="fpill ${p.cls} ${filters.status === p.key ? "active" : ""}" onclick="toggleFilter('status',${p.key ? `'${p.key}'` : 'null'})">
+    <span class="fpill-dot"></span>${p.label}
+  </button>`).join("");
+
+  const sortPills = [
+    { key: "newest", label: "Nyeste" }, { key: "price_asc", label: "Billigst" },
+    { key: "price_desc", label: "Dyreste" }, { key: "name", label: "A–Å" },
+  ].map(s => `<button class="fpill fpill-sort ${sort === s.key ? "active" : ""}" onclick="setSort('${s.key}')">${s.label}</button>`).join("");
+
   bar.innerHTML = `
-    <span class="filter-sep">Sorter:</span>${sortBtns}
-    <span class="filter-sep">Filter:</span>
-    <button class="filter-btn ${!filters.cat && !filters.status ? "active" : ""}" onclick="clearFilters()">Alle</button>
-    ${statusBtns}${catBtns}`;
+    <div class="filter-area">
+      <div class="search-bar">
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="search-input" type="text" placeholder="Søk…" value="${searchQuery}" oninput="setSearch(this.value)" autocomplete="off" autocorrect="off">
+      </div>
+      <div class="cat-tabs">${catTabs}</div>
+      <div class="filter-row">${statusPills}<span class="pill-sep">↕</span>${sortPills}</div>
+    </div>`;
 }
 
 function toggleFilter(key, val) {
-  filters[key] = filters[key] === val ? null : val;
+  filters[key] = (val === null || filters[key] === val) ? null : val;
+  render();
+}
+function toggleCat(val) {
+  filters.cat = (val === null || filters.cat === val) ? null : val;
   render();
 }
 function clearFilters() {
   filters = { cat: null, status: null, month: null };
+  searchQuery = "";
   render();
 }
 function setSort(key) {
   sort = key;
   render();
+}
+function setSearch(q) {
+  searchQuery = q;
+  renderWishlist();
 }
 
 function render() {
