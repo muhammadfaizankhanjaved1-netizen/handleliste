@@ -38,6 +38,8 @@ def main():
         try:
             result = scrape(url)
             now = datetime.now(timezone.utc).isoformat()
+            # Behold eksisterende kategorier hvis de allerede er satt
+            cats = item.get("categories") or result["categories"]
             item.update({
                 "name":          result["name"] or url,
                 "image":         result["image"],
@@ -45,7 +47,7 @@ def main():
                 "price_history": [{"date": now[:10], "price": result["price_current"]}]
                                   if result["price_current"] else [],
                 "currency":      result.get("currency", "NOK"),
-                "categories":    result["categories"],
+                "categories":    cats,
                 "status":        "ønske",
                 "last_error":    result.get("error"),
             })
