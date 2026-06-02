@@ -47,8 +47,12 @@ def _shopify_scrape(url: str) -> dict | None:
 
 # ── FINN.no ───────────────────────────────────────────────────────────────────
 def _finn_scrape(url: str) -> dict | None:
-    m = re.search(r"finnkode=(\d+)", url)
-    if not m:
+    # Aksepterer alle Finn.no-produkt-URLer: kort (finn.no/123), recommerce, og finnkode=
+    is_product = (
+        re.search(r"finnkode=(\d+)", url)
+        or re.search(r"finn\.no/(?:recommerce/[^?#]+/)?(\d+)", url)
+    )
+    if not is_product:
         return None
     try:
         r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=12)
@@ -480,7 +484,10 @@ def scrape_price_only(url: str) -> int | None:
         fr = _finn_scrape(url)
         if fr and fr.get("price_current"):
             return fr["price_current"]
-        return None
+        if fr is not None:
+            # URL gjenkjent som Finn-produkt men pris ikke funnet
+            return None
+        # fr=None betyr ukjent URL-format — fall gjennom til generell scraping
 
     if re.search(r"/products/", url):
         sr = _shopify_scrape(url)

@@ -37,6 +37,10 @@ def main():
             new_price = scrape_price_only(url)
             if new_price and new_price != item.get("price_current"):
                 old = item.get("price_current")
+                # Sanity: avvis pris > 10x gammel pris (typisk scraping-artefakt)
+                if old and new_price > old * 10:
+                    LOG(f"    Mistenkelig pris {new_price} kr (var {old} kr) — ignorert")
+                    continue
                 item["price_current"] = new_price
                 history = item.get("price_history") or []
                 history.append({"date": today, "price": new_price})

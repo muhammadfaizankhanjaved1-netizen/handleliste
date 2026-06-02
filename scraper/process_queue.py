@@ -3,7 +3,11 @@ Behandler alle items med status 'pending' i JSONBin.
 Kjøres automatisk av Task Scheduler ved oppstart og annenhver dag.
 """
 import sys
+import io
 from datetime import datetime, timezone
+
+# Force UTF-8 output so Unicode chars don't crash on Windows cp1252 terminals
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 import jsonbin_client as client
