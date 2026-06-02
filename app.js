@@ -2,10 +2,10 @@
 const BIN_KEY = "$2a$10$YQtpXheoXVrQaXo3Sch4G..IWw/ZuAWYFnc1XPBxa82aBCieCR6XC";
 const BIN_ID  = "6a1007006877513b27b2fcfe";
 const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-const CATEGORIES = ["Skole", "Klær", "Fritid", "Gym", "Jobb"];
+const CATEGORIES = ["Skole", "Klær", "Fritid", "Gym", "Jobb", "Arbeid"];
 const MONTHS = ["Jan","Feb","Mar","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Des"];
-const CAT_CLS = { "Skole": "skole", "Klær": "klar", "Fritid": "fritid", "Gym": "gym", "Jobb": "jobb" };
-const CAT_ICONS = { "Skole": "🎓", "Klær": "👕", "Fritid": "🎮", "Gym": "🏋️", "Jobb": "💼" };
+const CAT_CLS = { "Skole": "skole", "Klær": "klar", "Fritid": "fritid", "Gym": "gym", "Jobb": "jobb", "Arbeid": "arbeid" };
+const CAT_ICONS = { "Skole": "🎓", "Klær": "👕", "Fritid": "🎮", "Gym": "🏋️", "Jobb": "💼", "Arbeid": "🔧" };
 const STATUS_ORDER = ["pending","ønske","sparer_til","bestilt","kjøpt"];
 const STATUS_NEXT = { ønske:"sparer_til", sparer_til:"bestilt", bestilt:"kjøpt" };
 const STATUS_LABELS = { pending:"Henter...", ønske:"Ønske", sparer_til:"Sparer til", bestilt:"Bestilt", kjøpt:"Kjøpt" };
