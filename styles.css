@@ -34,7 +34,7 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100dvh;
-  padding-bottom: 90px;
+  padding-bottom: calc(90px + env(safe-area-inset-bottom));
   -webkit-font-smoothing: antialiased;
   max-width: 480px;
   margin: 0 auto;
