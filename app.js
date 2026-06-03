@@ -342,7 +342,7 @@ function renderFilters() {
   const bar = document.getElementById("filter-bar");
 
   const catTabs = [{ key: null, icon: "✨", label: "Alle" }, ...CATEGORIES.map(c => ({ key: c, icon: CAT_ICONS[c], label: c }))]
-    .map(t => `<button class="cat-tab ${filters.cat === t.key ? "active" : ""}" onclick="toggleCat(${t.key ? `'${t.key}'` : 'null'})">
+    .map(t => `<button type="button" class="cat-tab ${filters.cat === t.key ? "active" : ""}" onclick="toggleCat(${t.key ? `'${t.key}'` : 'null'})">
       <span class="cat-tab-icon">${t.icon}</span>${t.label}
     </button>`).join("");
 
@@ -351,14 +351,14 @@ function renderFilters() {
     { key: "ønske",     cls: "pill-ønske",   label: "Ønsker" },
     { key: "sparer_til",cls: "pill-sparer",  label: "Sparer til" },
     { key: "bestilt",   cls: "pill-bestilt", label: "Bestilt" },
-  ].map(p => `<button class="fpill ${p.cls} ${filters.status === p.key ? "active" : ""}" onclick="toggleFilter('status',${p.key ? `'${p.key}'` : 'null'})">
+  ].map(p => `<button type="button" class="fpill ${p.cls} ${filters.status === p.key ? "active" : ""}" onclick="toggleFilter('status',${p.key ? `'${p.key}'` : 'null'})">
     <span class="fpill-dot"></span>${p.label}
   </button>`).join("");
 
   const sortPills = [
     { key: "newest", label: "Nyeste" }, { key: "price_asc", label: "Billigst" },
     { key: "price_desc", label: "Dyreste" }, { key: "name", label: "A–Å" },
-  ].map(s => `<button class="fpill fpill-sort ${sort === s.key ? "active" : ""}" onclick="setSort('${s.key}')">${s.label}</button>`).join("");
+  ].map(s => `<button type="button" class="fpill fpill-sort ${sort === s.key ? "active" : ""}" onclick="setSort('${s.key}')">${sort === s.key ? "✓ " : ""}${s.label}</button>`).join("");
 
   bar.innerHTML = `
     <div class="filter-area">
@@ -394,6 +394,7 @@ function setSearch(q) {
 }
 
 function render() {
+  const scrollY = window.scrollY;
   renderTotals();
   renderNextPurchase();
   renderFilters();
@@ -403,6 +404,7 @@ function render() {
 
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
   document.getElementById(`nav-${view}`).classList.add("active");
+  window.scrollTo({ top: scrollY, behavior: "instant" });
 }
 
 // ── Add item ─────────────────────────────────────────────────────────────────
