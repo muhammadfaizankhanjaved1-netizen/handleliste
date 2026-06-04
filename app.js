@@ -377,16 +377,12 @@ function renderFilters() {
 }
 
 function toggleFilter(key, val) {
-  const sy = window.scrollY;
   filters[key] = (val === null || filters[key] === val) ? null : val;
   render();
-  requestAnimationFrame(() => window.scrollTo(0, sy));
 }
 function toggleCat(val) {
-  const sy = window.scrollY;
   filters.cat = (val === null || filters.cat === val) ? null : val;
   render();
-  requestAnimationFrame(() => window.scrollTo(0, sy));
 }
 function clearFilters() {
   filters = { cat: null, status: null, month: null };
@@ -394,10 +390,8 @@ function clearFilters() {
   render();
 }
 function setSort(key) {
-  const sy = window.scrollY;
   sort = key;
   render();
-  requestAnimationFrame(() => window.scrollTo(0, sy));
 }
 function setSearch(q) {
   searchQuery = q;
