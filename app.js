@@ -375,13 +375,13 @@ function toggleFilter(key, val) {
   const sy = window.scrollY;
   filters[key] = (val === null || filters[key] === val) ? null : val;
   render();
-  window.scrollTo(0, sy);
+  requestAnimationFrame(() => window.scrollTo(0, sy));
 }
 function toggleCat(val) {
   const sy = window.scrollY;
   filters.cat = (val === null || filters.cat === val) ? null : val;
   render();
-  window.scrollTo(0, sy);
+  requestAnimationFrame(() => window.scrollTo(0, sy));
 }
 function clearFilters() {
   filters = { cat: null, status: null, month: null };
@@ -392,7 +392,7 @@ function setSort(key) {
   const sy = window.scrollY;
   sort = key;
   render();
-  window.scrollTo(0, sy);
+  requestAnimationFrame(() => window.scrollTo(0, sy));
 }
 function setSearch(q) {
   searchQuery = q;
