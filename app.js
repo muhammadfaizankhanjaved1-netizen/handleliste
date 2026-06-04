@@ -372,12 +372,16 @@ function renderFilters() {
 }
 
 function toggleFilter(key, val) {
+  const sy = window.scrollY;
   filters[key] = (val === null || filters[key] === val) ? null : val;
   render();
+  window.scrollTo(0, sy);
 }
 function toggleCat(val) {
+  const sy = window.scrollY;
   filters.cat = (val === null || filters.cat === val) ? null : val;
   render();
+  window.scrollTo(0, sy);
 }
 function clearFilters() {
   filters = { cat: null, status: null, month: null };
@@ -385,8 +389,10 @@ function clearFilters() {
   render();
 }
 function setSort(key) {
+  const sy = window.scrollY;
   sort = key;
   render();
+  window.scrollTo(0, sy);
 }
 function setSearch(q) {
   searchQuery = q;
@@ -394,7 +400,6 @@ function setSearch(q) {
 }
 
 function render() {
-  const scrollY = window.scrollY;
   renderTotals();
   renderNextPurchase();
   renderFilters();
@@ -404,7 +409,6 @@ function render() {
 
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
   document.getElementById(`nav-${view}`).classList.add("active");
-  window.scrollTo({ top: scrollY, behavior: "instant" });
 }
 
 // ── Add item ─────────────────────────────────────────────────────────────────
