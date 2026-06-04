@@ -340,6 +340,8 @@ function renderTotals() {
 
 function renderFilters() {
   const bar = document.getElementById("filter-bar");
+  const prevCatScroll = bar.querySelector(".cat-tabs")?.scrollLeft ?? 0;
+  const prevRowScroll = bar.querySelector(".filter-row")?.scrollLeft ?? 0;
 
   const catTabs = [{ key: null, icon: "✨", label: "Alle" }, ...CATEGORIES.map(c => ({ key: c, icon: CAT_ICONS[c], label: c }))]
     .map(t => `<button type="button" class="cat-tab ${filters.cat === t.key ? "active" : ""}" onclick="toggleCat(${t.key ? `'${t.key}'` : 'null'})">
@@ -369,6 +371,9 @@ function renderFilters() {
       <div class="cat-tabs">${catTabs}</div>
       <div class="filter-row">${statusPills}<span class="pill-sep">↕</span>${sortPills}</div>
     </div>`;
+
+  bar.querySelector(".cat-tabs").scrollLeft = prevCatScroll;
+  bar.querySelector(".filter-row").scrollLeft = prevRowScroll;
 }
 
 function toggleFilter(key, val) {
