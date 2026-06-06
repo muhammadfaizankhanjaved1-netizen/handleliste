@@ -161,6 +161,7 @@ function filteredItems() {
     if (sort === "price_asc")  return (a.price_current || Infinity) - (b.price_current || Infinity);
     if (sort === "price_desc") return (b.price_current || 0) - (a.price_current || 0);
     if (sort === "name")       return (a.name || "").localeCompare(b.name || "", "nb");
+    if (sort === "oldest")     return new Date(a.added_at || 0) - new Date(b.added_at || 0);
     return new Date(b.added_at || 0) - new Date(a.added_at || 0);
   });
 }
@@ -217,6 +218,7 @@ function renderWishlist() {
   const items = filteredItems();
   const main = document.getElementById("main");
   const isFiltered = filters.cat || filters.status || searchQuery.trim();
+  const isDateSort = sort === "newest" || sort === "oldest";
 
   if (!items.length) {
     main.innerHTML = `<div class="empty"><div class="empty-icon">🛒</div>
@@ -224,7 +226,7 @@ function renderWishlist() {
     return;
   }
 
-  if (isFiltered) {
+  if (isFiltered || isDateSort) {
     main.innerHTML = `<div class="grid">${items.map(renderCard).join("")}</div>`;
     return;
   }
@@ -383,8 +385,9 @@ function renderFilters() {
   </button>`).join("");
 
   const sortPills = [
-    { key: "newest", label: "Nyeste" }, { key: "price_asc", label: "Billigst" },
-    { key: "price_desc", label: "Dyreste" }, { key: "name", label: "A–Å" },
+    { key: "newest", label: "Nyeste" }, { key: "oldest", label: "Gamleste" },
+    { key: "price_asc", label: "Billigst" }, { key: "price_desc", label: "Dyreste" },
+    { key: "name", label: "A–Å" },
   ].map(s => `<button type="button" class="fpill fpill-sort ${sort === s.key ? "active" : ""}" onclick="setSort('${s.key}')">${sort === s.key ? "✓ " : ""}${s.label}</button>`).join("");
 
   bar.innerHTML = `
