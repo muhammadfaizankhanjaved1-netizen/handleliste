@@ -632,6 +632,38 @@ body {
 /* ── OFFLINE ── */
 #offline-banner { border-bottom: 1px solid rgba(239,68,68,0.3); }
 
+/* ── PENDING QUEUE ── */
+#pending-bar { padding: 0 14px 4px; }
+.pending-queue { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.pq-header {
+  font-size: .7rem; font-weight: 700; color: var(--subtext); letter-spacing: .04em;
+  padding: 8px 12px 6px; text-transform: uppercase;
+}
+.pq-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 12px; border-top: 1px solid var(--border);
+}
+.pq-avatar {
+  width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+  background: var(--accent2); color: #fff; font-size: .75rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.pq-info { flex: 1; min-width: 0; }
+.pq-domain { font-size: .75rem; font-weight: 600; color: var(--text); }
+.pq-url { font-size: .65rem; color: var(--subtext); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pq-spinner {
+  width: 13px; height: 13px; flex-shrink: 0;
+  border: 2px solid rgba(129,140,248,.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+.pq-delete {
+  background: none; border: none; color: var(--subtext); font-size: .8rem;
+  cursor: pointer; padding: 2px 4px; border-radius: 4px; flex-shrink: 0;
+}
+.pq-delete:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
+
 /* ── RESPONSIVE ── */
 @media (min-width: 600px) {
   body { max-width: 480px; margin: 0 auto; }

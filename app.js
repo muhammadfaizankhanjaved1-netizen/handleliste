@@ -150,6 +150,7 @@ function activeItems() {
 function filteredItems() {
   const q = searchQuery.trim().toLowerCase();
   const items = activeItems().filter(i => {
+    if (i.status === "pending") return false;
     if (filters.cat && !(i.categories || []).includes(filters.cat)) return false;
     if (filters.status && i.status !== filters.status) return false;
     if (filters.month && i.month !== filters.month) return false;
@@ -185,6 +186,30 @@ function renderNextPurchase() {
     <div class="next-price-col">
       <div class="next-price">${fmt(next.price_current)}</div>
     </div>
+  </div>`;
+}
+
+function renderPendingBar() {
+  const pending = data.items.filter(i => i.status === "pending");
+  const el = document.getElementById("pending-bar");
+  if (!el) return;
+  if (!pending.length) { el.innerHTML = ""; return; }
+  const rows = pending.map(item => {
+    const domain = (() => { try { return new URL(item.url).hostname.replace("www.",""); } catch { return "?"; } })();
+    const initial = domain[0].toUpperCase();
+    return `<div class="pq-item">
+      <div class="pq-avatar">${initial}</div>
+      <div class="pq-info">
+        <div class="pq-domain">${domain}</div>
+        <div class="pq-url">${item.url.replace(/^https?:\/\/(www\.)?/,"").split("?")[0].slice(0,40)}</div>
+      </div>
+      <div class="pq-spinner"></div>
+      <button class="pq-delete" onclick="deleteItem('${item.id}')">✕</button>
+    </div>`;
+  }).join("");
+  el.innerHTML = `<div class="pending-queue">
+    <div class="pq-header">⏳ Henter ${pending.length} vare${pending.length > 1 ? "r" : ""}…</div>
+    ${rows}
   </div>`;
 }
 
@@ -402,6 +427,7 @@ function render() {
   renderTotals();
   renderNextPurchase();
   renderFilters();
+  renderPendingBar();
   if (view === "wishlist") renderWishlist();
   else if (view === "months") renderMonths();
   else renderArchive();
