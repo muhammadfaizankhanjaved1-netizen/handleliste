@@ -75,6 +75,46 @@ function toast(msg, isError = false) {
   setTimeout(() => el.classList.remove("show"), 2800);
 }
 
+// ── Valuta ───────────────────────────────────────────────────────────────────
+let exchangeRates = null; // NOK per 1 enhet av fremmed valuta
+let ratesFetchedAt = 0;
+
+async function getExchangeRates() {
+  if (exchangeRates && Date.now() - ratesFetchedAt < 3_600_000) return exchangeRates;
+  try {
+    const r = await fetch("https://open.er-api.com/v6/latest/NOK");
+    if (!r.ok) throw new Error();
+    const j = await r.json();
+    const rates = { NOK: 1 };
+    for (const [cur, rate] of Object.entries(j.rates || {})) {
+      if (rate) rates[cur] = 1 / rate;
+    }
+    exchangeRates = rates;
+    ratesFetchedAt = Date.now();
+  } catch {}
+  return exchangeRates;
+}
+
+function toNok(amount, currency) {
+  if (currency === "NOK") return Math.round(amount);
+  if (!exchangeRates?.[currency]) return null;
+  return Math.round(amount * exchangeRates[currency]);
+}
+
+async function updateCurrencyPreview() {
+  const cur    = document.getElementById("edit-currency")?.value || "NOK";
+  const amount = parseFloat(document.getElementById("edit-price")?.value);
+  const preview = document.getElementById("currency-preview");
+  if (!preview) return;
+  if (cur === "NOK" || !amount || isNaN(amount)) { preview.textContent = ""; return; }
+  const rates = await getExchangeRates();
+  if (!rates) { preview.textContent = "Kunne ikke hente kurs — sjekk nett"; return; }
+  const nok = toNok(amount, cur);
+  if (nok == null) { preview.textContent = "Ukjent valuta"; return; }
+  const rate = rates[cur];
+  preview.textContent = `≈ ${fmt(nok)} · kurs: 1 ${cur} = ${rate.toFixed(2)} kr`;
+}
+
 // ── Format ───────────────────────────────────────────────────────────────────
 function fmt(price) {
   if (price == null) return null;
@@ -445,8 +485,12 @@ async function addItem(url) {
   if (!url || !url.startsWith("http")) { toast("Lim inn en gyldig URL", true); return; }
   if (data.items.find(i => i.url === url)) { toast("Lenken er allerede i lista"); return; }
 
-  const manualName  = document.getElementById("add-name").value.trim();
-  const manualPrice = parseInt(document.getElementById("add-price").value, 10) || null;
+  const manualName     = document.getElementById("add-name").value.trim();
+  const priceRaw       = parseFloat(document.getElementById("add-price").value) || null;
+  const addCur         = document.getElementById("add-currency")?.value || "NOK";
+  const manualPrice    = priceRaw
+    ? (addCur === "NOK" ? Math.round(priceRaw) : (toNok(priceRaw, addCur) ?? Math.round(priceRaw)))
+    : null;
   const now         = new Date().toISOString();
 
   const item = {
@@ -549,6 +593,10 @@ function openEdit(id) {
   document.getElementById("edit-month").value  = item.month || "";
   document.getElementById("edit-notes").value  = item.notes || "";
   document.getElementById("edit-status").value = item.status;
+  const curSel = document.getElementById("edit-currency");
+  if (curSel) curSel.value = "NOK";
+  const preview = document.getElementById("currency-preview");
+  if (preview) preview.textContent = "";
   const imgInput = document.getElementById("edit-image");
   const imgPreview = document.getElementById("edit-image-preview");
   imgInput.value = item.image || "";
@@ -583,9 +631,12 @@ async function saveEdit() {
   const newImg = document.getElementById("edit-image").value.trim();
   if (newImg && newImg.startsWith("http")) item.image = newImg;
   else if (!newImg) item.image = null;
-  const newPrice = parseInt(document.getElementById("edit-price").value, 10);
+  const rawPrice  = parseFloat(document.getElementById("edit-price").value);
+  const newCur    = document.getElementById("edit-currency")?.value || "NOK";
+  const newPrice  = rawPrice ? (newCur === "NOK" ? Math.round(rawPrice) : toNok(rawPrice, newCur)) : null;
   if (newPrice && newPrice !== item.price_current) {
     item.price_current = newPrice;
+    item.currency = "NOK";
     const today = new Date().toISOString().slice(0, 10);
     item.price_history = [...(item.price_history || []), { date: today, price: newPrice }];
   }
@@ -639,6 +690,7 @@ async function boot() {
     navigator.serviceWorker.addEventListener("controllerchange", () => window.location.reload());
   }
 
+  getExchangeRates();
   await load();
   render();
   handleSharedUrl();
