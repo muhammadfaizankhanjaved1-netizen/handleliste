@@ -304,7 +304,11 @@ body {
   height: 44px;
   color: var(--text);
 }
-.add-extra { display: flex; gap: 8px; padding: 6px 16px 0; }
+.add-extra {
+  display: flex; gap: 8px; padding: 6px 16px 16px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
 .add-extra-input {
   flex: 1; height: 38px; padding: 0 12px;
   border-radius: 10px; border: 1px solid var(--border);
@@ -344,7 +348,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
-  padding: 0 16px 14px;
+  padding: 10px 16px 14px;
 }
 
 /* ── CARD ── */
