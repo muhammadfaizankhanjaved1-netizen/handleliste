@@ -30,7 +30,9 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html {
   font-size: 16px;
-  overflow-x: hidden;
+  /* NB: overflow-x MÅ IKKE settes her — overflow-x:hidden på html fanger alle
+     horisontale touch-gestures på dokumentnivå og blokkerer scroll i barn-elementer
+     (f.eks. .cat-tabs og .filter-row) på iOS Safari. Kun body håndterer dette. */
   overscroll-behavior-y: none;
 }
 body {
@@ -201,6 +203,7 @@ body {
 .search-input::placeholder { color: var(--subtext); }
 
 /* Category tabs */
+/* NB: touch-action:pan-x er påkrevd for horisontal scroll på iOS — ikke fjern. */
 .cat-tabs {
   display: flex;
   gap: 7px;
@@ -208,6 +211,8 @@ body {
   scrollbar-width: none;
   padding-bottom: 2px;
   margin-bottom: 8px;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 .cat-tabs::-webkit-scrollbar { display: none; }
 .cat-tab {
@@ -231,12 +236,15 @@ body {
 .cat-tab-icon { font-size: 1rem; line-height: 1; }
 
 /* Status + sort row */
+/* NB: touch-action:pan-x er påkrevd for horisontal scroll på iOS — ikke fjern. */
 .filter-row {
   display: flex;
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
   padding-bottom: 2px;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 .filter-row::-webkit-scrollbar { display: none; }
 .fpill {
