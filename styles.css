@@ -44,7 +44,11 @@ body {
   -webkit-font-smoothing: antialiased;
   max-width: 480px;
   margin: 0 auto;
-  overflow-x: hidden;
+  /* NB: overflow-x:clip (IKKE hidden) — clip klipper innhold uten å lage en scroll-container.
+     overflow-x:hidden lager en scroll-container som blokkerer touch-events til barn-elementer
+     med overflow-x:auto (f.eks. .cat-tabs og .filter-row) på iOS Safari. */
+  overflow-x: hidden; /* fallback for eldre iOS */
+  overflow-x: clip;
   overscroll-behavior-y: none;
   touch-action: manipulation;
 }

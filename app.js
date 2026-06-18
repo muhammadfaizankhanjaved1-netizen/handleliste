@@ -405,6 +405,22 @@ function renderTotals() {
   document.getElementById("totals-bar").innerHTML = html;
 }
 
+function _attachHScroll(el) {
+  let startX = 0, startY = 0, startLeft = 0, decided = false, isHorz = false;
+  el.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startLeft = el.scrollLeft;
+    decided = false; isHorz = false;
+  }, { passive: true });
+  el.addEventListener("touchmove", e => {
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (!decided) { decided = true; isHorz = Math.abs(dx) > Math.abs(dy); }
+    if (isHorz) { e.preventDefault(); el.scrollLeft = startLeft - dx; }
+  }, { passive: false });
+}
+
 function renderFilters() {
   const bar = document.getElementById("filter-bar");
   const prevCatScroll = bar.querySelector(".cat-tabs")?.scrollLeft ?? 0;
@@ -442,6 +458,8 @@ function renderFilters() {
 
   bar.querySelector(".cat-tabs").scrollLeft = prevCatScroll;
   bar.querySelector(".filter-row").scrollLeft = prevRowScroll;
+  _attachHScroll(bar.querySelector(".cat-tabs"));
+  _attachHScroll(bar.querySelector(".filter-row"));
 }
 
 function toggleFilter(key, val) {
