@@ -1,8 +1,15 @@
-const CACHE = "handleliste-v7";
-const SHELL = ["./", "./index.html", "./app.js", "./styles.css", "./manifest.json", "./icon.svg"];
+const CACHE = "handleliste-v8";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./app.js",
+  "./styles.css",
+  "./manifest.json",
+  "./icon.svg",
+];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
@@ -16,13 +23,12 @@ self.addEventListener("activate", e => {
 });
 
 self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET") return;
   e.respondWith(
     fetch(e.request)
-      .then(res => {
-        const clone = res.clone();
+      .then(r => {
+        const clone = r.clone();
         caches.open(CACHE).then(c => c.put(e.request, clone));
-        return res;
+        return r;
       })
       .catch(() => caches.match(e.request))
   );

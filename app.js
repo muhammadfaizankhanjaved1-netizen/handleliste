@@ -6,10 +6,10 @@ const CATEGORIES = ["Skole", "Klær", "Fritid", "Gym", "Jobb", "Arbeid"];
 const MONTHS = ["Jan","Feb","Mar","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Des"];
 const CAT_CLS = { "Skole": "skole", "Klær": "klar", "Fritid": "fritid", "Gym": "gym", "Jobb": "jobb", "Arbeid": "arbeid" };
 const CAT_ICONS = { "Skole": "🎓", "Klær": "👕", "Fritid": "🎮", "Gym": "🏋️", "Jobb": "💼", "Arbeid": "🔧" };
-const STATUS_ORDER = ["pending","ønske","sparer_til","bestilt","kjøpt"];
-const STATUS_NEXT = { ønske:"sparer_til", sparer_til:"bestilt", bestilt:"kjøpt" };
-const STATUS_LABELS = { pending:"Henter...", ønske:"Ønske", sparer_til:"Sparer til", bestilt:"Bestilt", kjøpt:"Kjøpt" };
-const STATUS_ICONS  = { pending:"⏳", ønske:"♡", sparer_til:"💰", bestilt:"📦", kjøpt:"✓" };
+const STATUS_ORDER = ["pending","ser_på","ønske","sparer_til","bestilt","kjøpt"];
+const STATUS_NEXT = { ser_på:"ønske", ønske:"sparer_til", sparer_til:"bestilt", bestilt:"kjøpt" };
+const STATUS_LABELS = { pending:"Henter...", ser_på:"Ser på", ønske:"Ønsker", sparer_til:"Sparer til", bestilt:"Bestilt", kjøpt:"Kjøpt" };
+const STATUS_ICONS  = { pending:"⏳", ser_på:"👁", ønske:"♡", sparer_til:"💰", bestilt:"📦", kjøpt:"✓" };
 
 // ── State ────────────────────────────────────────────────────────────────────
 let data = { categories: CATEGORIES, items: [] };
@@ -76,7 +76,7 @@ function toast(msg, isError = false) {
 }
 
 // ── Valuta ───────────────────────────────────────────────────────────────────
-let exchangeRates = null; // NOK per 1 enhet av fremmed valuta
+let exchangeRates = null;
 let ratesFetchedAt = 0;
 
 async function getExchangeRates() {
@@ -150,37 +150,144 @@ function renderCard(item) {
   const monthHtml = item.month
     ? `<div class="card-month">📅 ${item.month}</div>` : "";
 
-  const statusBadge = (item.status !== "kjøpt" && item.status !== "ønske") ? `
+  // Only show badge for statuses above "ønske" (sparer_til, bestilt)
+  const showBadge = item.status === "sparer_til" || item.status === "bestilt";
+  const statusBadge = showBadge ? `
     <div class="status-badge">
-      ${item.status !== "pending" ? `<span class="status-dot-sm sd-${item.status === "sparer_til" ? "sparer" : item.status}"></span>` : ""}
-      ${STATUS_ICONS[item.status] || ""} ${item.status !== "pending" ? STATUS_LABELS[item.status] : "Henter…"}
+      <span class="status-dot-sm sd-${item.status === "sparer_til" ? "sparer" : item.status}"></span>
+      ${STATUS_ICONS[item.status]} ${STATUS_LABELS[item.status]}
     </div>` : "";
 
   const imgHtml = cardImg(item);
+  const clickable = item.status !== "pending";
 
-  const actionBtns = item.status !== "pending" ? `
-    <div class="card-actions">
-      ${STATUS_NEXT[item.status] ? `<button onclick="nextStatus('${item.id}')">→ ${STATUS_LABELS[STATUS_NEXT[item.status]]}</button>` : ""}
-      <button onclick="openEdit('${item.id}')">Rediger</button>
-      <button class="btn-delete" onclick="deleteItem('${item.id}')">✕</button>
-    </div>` : `
-    <div class="card-actions">
-      <button class="btn-delete" onclick="deleteItem('${item.id}')">Avbryt</button>
-    </div>`;
-
-  return `<div class="card" data-id="${item.id}">
+  return `<div class="card${clickable ? " card-tappable" : ""}" data-id="${item.id}"${clickable ? ` onclick="openDetail('${item.id}')"` : ""}>
     ${drop ? '<div class="price-drop">↓ Prisfall</div>' : ""}
     ${statusBadge}
-    <a href="${item.url}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
-      ${imgHtml}
-    </a>
+    ${imgHtml}
     <div class="card-body">
       <div class="card-name">${item.name || item.url}</div>
       ${priceHtml}
       ${monthHtml}
     </div>
-    ${actionBtns}
   </div>`;
+}
+
+// ── Product detail sheet ──────────────────────────────────────────────────────
+let detailId = null;
+
+function openDetail(id) {
+  const item = data.items.find(i => i.id === id);
+  if (!item || item.status === "pending") return;
+  detailId = id;
+
+  const overlay = document.getElementById("detail-overlay");
+
+  // Image
+  const imgEl = overlay.querySelector(".detail-img");
+  if (item.image) {
+    imgEl.innerHTML = `<img src="${item.image}" alt="" onerror="this.style.display='none'">`;
+  } else {
+    const initial = (() => { try { return new URL(item.url).hostname.replace("www.","")[0].toUpperCase(); } catch { return "?"; } })();
+    imgEl.innerHTML = `<div class="detail-img-placeholder">${initial}</div>`;
+  }
+
+  // Name
+  overlay.querySelector(".detail-name").textContent = item.name || item.url;
+
+  // Price
+  const priceEl = overlay.querySelector(".detail-price");
+  if (item.price_current) {
+    const h = item.price_history;
+    let changeHtml = "";
+    if (h && h.length >= 2) {
+      const prev = h[h.length - 2].price;
+      const curr = h[h.length - 1].price;
+      const diff = curr - prev;
+      if (diff !== 0) {
+        const pct = Math.abs(Math.round((diff / prev) * 100));
+        changeHtml = `<span class="detail-price-change ${diff < 0 ? 'down' : 'up'}">${diff < 0 ? '↓' : '↑'} ${pct}%</span>`;
+      }
+    }
+    priceEl.innerHTML = `<span class="detail-price-amount">${fmt(item.price_current)}</span>${changeHtml}`;
+  } else {
+    priceEl.innerHTML = `<span class="detail-no-price">Ingen pris</span>`;
+  }
+
+  // Categories
+  const catsEl = overlay.querySelector(".detail-cats");
+  const cats = (item.categories || []);
+  catsEl.innerHTML = cats.map(c =>
+    `<span class="detail-cat">${CAT_ICONS[c] || ""} ${c}</span>`
+  ).join("");
+  catsEl.style.display = cats.length ? "flex" : "none";
+
+  // Notes
+  const notesEl = overlay.querySelector(".detail-notes");
+  notesEl.textContent = item.notes || "";
+  notesEl.style.display = item.notes ? "block" : "none";
+
+  // Status buttons
+  const statusRow = overlay.querySelector(".detail-status-row");
+  const statuses = ["ser_på","ønske","sparer_til","bestilt","kjøpt"];
+  statusRow.innerHTML = statuses.map(s => {
+    const isActive = item.status === s;
+    const cls = s.replace("_","-");
+    return `<button class="detail-status-btn detail-status-${cls}${isActive ? " active" : ""}"
+      onclick="setItemStatus('${item.id}','${s}')">${STATUS_ICONS[s]} ${STATUS_LABELS[s]}</button>`;
+  }).join("");
+
+  // URL button
+  overlay.querySelector(".detail-url-btn").href = item.url;
+
+  // Image tappable to open URL
+  const imgWrap = overlay.querySelector(".detail-img-wrap");
+  imgWrap.onclick = (e) => {
+    if (e.target.closest(".detail-close")) return;
+    window.open(item.url, "_blank", "noopener");
+  };
+
+  overlay.classList.add("open");
+  // Prevent body scroll
+  document.body.style.overflow = "hidden";
+}
+
+function closeDetail() {
+  document.getElementById("detail-overlay").classList.remove("open");
+  document.body.style.overflow = "";
+  detailId = null;
+}
+
+async function setItemStatus(id, newStatus) {
+  const item = data.items.find(i => i.id === id);
+  if (!item) return;
+  item.status = newStatus;
+  if (newStatus === "kjøpt" && !item.purchased_at) item.purchased_at = new Date().toISOString();
+
+  // Update status buttons in the open detail sheet without closing
+  const overlay = document.getElementById("detail-overlay");
+  if (overlay.classList.contains("open") && detailId === id) {
+    overlay.querySelectorAll(".detail-status-btn").forEach(btn => btn.classList.remove("active"));
+    const cls = newStatus.replace("_","-");
+    overlay.querySelector(`.detail-status-${cls}`)?.classList.add("active");
+  }
+
+  render();
+  await save();
+  toast(STATUS_LABELS[newStatus]);
+}
+
+function openEditFromDetail() {
+  const id = detailId;
+  closeDetail();
+  setTimeout(() => openEdit(id), 60);
+}
+
+async function deleteFromDetail() {
+  if (!detailId) return;
+  const id = detailId;
+  closeDetail();
+  await deleteItem(id);
 }
 
 // ── Views ────────────────────────────────────────────────────────────────────
@@ -245,7 +352,7 @@ function renderPendingBar() {
         <div class="pq-url">${item.url.replace(/^https?:\/\/(www\.)?/,"").split("?")[0].slice(0,40)}</div>
       </div>
       <div class="pq-spinner"></div>
-      <button class="pq-delete" onclick="deleteItem('${item.id}')">✕</button>
+      <button class="pq-delete" onclick="deleteItem('${item.id}')">&#x2715;</button>
     </div>`;
   }).join("");
   el.innerHTML = `<div class="pending-queue">
@@ -271,7 +378,6 @@ function renderWishlist() {
     return;
   }
 
-  // Grouped by category with section headers + totals
   let html = "";
   const shown = new Set();
 
@@ -432,10 +538,11 @@ function renderFilters() {
     </button>`).join("");
 
   const statusPills = [
-    { key: null,        cls: "pill-all",     label: "Alle" },
-    { key: "ønske",     cls: "pill-ønske",   label: "Ønsker" },
-    { key: "sparer_til",cls: "pill-sparer",  label: "Sparer til" },
-    { key: "bestilt",   cls: "pill-bestilt", label: "Bestilt" },
+    { key: null,          cls: "pill-all",     label: "Alle" },
+    { key: "ser_på",      cls: "pill-serpa",   label: "Ser på" },
+    { key: "ønske",       cls: "pill-onske",   label: "Ønsker" },
+    { key: "sparer_til",  cls: "pill-sparer",  label: "Sparer til" },
+    { key: "bestilt",     cls: "pill-bestilt", label: "Bestilt" },
   ].map(p => `<button type="button" class="fpill ${p.cls} ${filters.status === p.key ? "active" : ""}" onclick="toggleFilter('status',${p.key ? `'${p.key}'` : 'null'})">
     <span class="fpill-dot"></span>${p.label}
   </button>`).join("");
@@ -513,7 +620,7 @@ async function addItem(url) {
 
   const item = {
     id: uuid(), url,
-    status: manualName ? "ønske" : "pending",
+    status: manualName ? "ser_på" : "pending",
     name:   manualName || null,
     image:  null,
     price_current: manualPrice,
@@ -575,10 +682,10 @@ function openPurchasePlan() {
       const imgHtml = item.image
         ? `<img src="${item.image}" alt="" onerror="this.parentNode.innerHTML='<span>${(item.name||"?")[0]}</span>'">`
         : `<span>${(item.name || "?")[0].toUpperCase()}</span>`;
-      const statusDot = item.status !== "ønske"
+      const statusDot = !["ser_på","ønske"].includes(item.status)
         ? `<span class="plan-dot sd-${item.status === "sparer_til" ? "sparer" : item.status}"></span>`
         : "";
-      html += `<div class="plan-item" onclick="closePurchasePlan();openEdit('${item.id}')">
+      html += `<div class="plan-item" onclick="closePurchasePlan();openDetail('${item.id}')">
         <div class="plan-thumb">${imgHtml}</div>
         <div class="plan-info">
           <div class="plan-name">${item.name || item.url}</div>
