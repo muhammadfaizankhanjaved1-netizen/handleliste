@@ -5,61 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Handleliste">
-  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-title" content="Ønsker">
+  <meta name="theme-color" content="#B0613F">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./icon.svg">
   <link rel="stylesheet" href="./styles.css">
-  <title>Handleliste</title>
+  <title>Ønsker</title>
 </head>
 <body>
 
 <!-- ── Offline banner ── -->
-<div id="offline-banner" style="display:none;background:#ef4444;color:#fff;text-align:center;padding:8px 12px;font-size:13px;position:sticky;top:0;z-index:100;">
+<div id="offline-banner" style="display:none;background:#A24A3A;color:#fff;text-align:center;padding:8px 12px;font-size:13px;position:sticky;top:0;z-index:100;">
   Offline — viser lagret versjon. Endringer lagres ikke. <button onclick="refreshData()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:2px 10px;border-radius:6px;cursor:pointer;margin-left:8px;">Prøv igjen</button>
 </div>
 
 <!-- ── Header ── -->
 <div class="header">
   <div class="header-top">
-    <h1>
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <path d="M28 30h8l10 28h22l6-20H36" stroke="var(--accent)" stroke-width="6"
-              stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <circle cx="46" cy="68" r="5" fill="var(--accent)"/>
-        <circle cx="62" cy="68" r="5" fill="var(--accent)"/>
-      </svg>
-      Handleliste
-    </h1>
+    <h1>Ønsker</h1>
     <div class="header-actions">
-      <button class="btn-icon" onclick="toggleTheme()" title="Bytt tema">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-             stroke="currentColor" width="18" height="18">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707
-                   M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>
-        </svg>
-      </button>
-      <button class="btn-icon" onclick="refreshData()" title="Oppdater">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-             stroke="currentColor" width="18" height="18">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0
-                   0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-        </svg>
-      </button>
+      <button class="currency-pill" id="currency-pill" onclick="cycleCurrency()">kr ▾</button>
+      <button class="theme-pill" id="theme-pill" onclick="cycleTheme()" title="Bytt tema">🎨</button>
+      <button class="btn-icon" onclick="openAdd()" title="Ny vare">+</button>
     </div>
   </div>
   <div class="totals-bar" id="totals-bar"></div>
 </div>
 
-<!-- ── Next purchase ── -->
-<div id="next-purchase-bar"></div>
-
-<!-- ── Filters ── -->
-<div id="filter-bar"></div>
-
-<!-- ── Add bar ── -->
+<!-- ── Add bar (lim inn lenke) ── -->
 <div class="add-bar">
   <input id="add-input" class="add-input" type="text" placeholder="Lim inn lenke…"
          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -68,72 +41,40 @@
 </div>
 <div class="add-extra">
   <input id="add-name" class="add-extra-input" type="text" placeholder="Navn (valgfritt)">
-  <div style="display:flex;gap:6px;align-items:center;">
-    <input id="add-price" class="add-extra-input add-price-input" type="number" placeholder="Pris" min="0" style="flex:1">
-    <select id="add-currency" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);font-size:13px;cursor:pointer;height:38px">
-      <option value="NOK">kr</option>
-      <option value="EUR">EUR</option>
-      <option value="USD">USD</option>
-      <option value="GBP">GBP</option>
-      <option value="SEK">SEK</option>
-      <option value="DKK">DKK</option>
-    </select>
-  </div>
+  <input id="add-price" class="add-extra-input add-price-input" type="number" placeholder="Pris" min="0">
+  <select id="add-currency" class="add-cur-select">
+    <option value="NOK">kr</option>
+    <option value="EUR">EUR</option>
+    <option value="USD">USD</option>
+    <option value="GBP">GBP</option>
+    <option value="SEK">SEK</option>
+    <option value="DKK">DKK</option>
+  </select>
 </div>
 
 <!-- ── Pending queue ── -->
 <div id="pending-bar"></div>
 
+<!-- ── Search / sort / filters ── -->
+<div id="filter-bar"></div>
+
 <!-- ── Main content ── -->
 <div id="main"></div>
 
-<!-- ── Product detail sheet ── -->
-<div class="modal-overlay" id="detail-overlay" onclick="if(event.target===this)closeDetail()">
-  <div class="modal detail-modal">
-    <div class="detail-img-wrap">
-      <div class="detail-img"></div>
-      <button class="detail-close" onclick="closeDetail()">&#x2715;</button>
-    </div>
-    <div class="detail-body">
-      <div class="detail-name"></div>
-      <div class="detail-price"></div>
-      <div class="detail-cats"></div>
-      <div class="detail-notes"></div>
-      <div class="detail-section-label">Status</div>
-      <div class="detail-status-row"></div>
-      <div class="detail-footer">
-        <a class="detail-url-btn" href="" target="_blank" rel="noopener">
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-          Åpne nettbutikk
-        </a>
-        <button class="detail-edit-btn" onclick="openEditFromDetail()">
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-          Rediger
-        </button>
-        <button class="detail-delete-btn" onclick="deleteFromDetail()">
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          Slett
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ── Purchase plan panel ── -->
-<div class="modal-overlay" id="plan-overlay" onclick="if(event.target===this)closePurchasePlan()">
-  <div class="modal plan-modal">
-    <div class="plan-header">
-      <h3>Planlagte kjøp</h3>
-      <span id="plan-total"></span>
-    </div>
-    <div id="plan-list"></div>
-  </div>
-</div>
-
-<!-- ── Edit modal ── -->
+<!-- ── Add / Edit sheet ── -->
 <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal">
-    <h3>Rediger vare</h3>
+    <div class="sheet-handle"></div>
+    <h3 id="edit-title">Ny vare</h3>
+
+    <div class="modal-row" id="link-field-row">
+      <label>Lenke</label>
+      <div class="link-row">
+        <input type="url" id="edit-url" placeholder="https://..." style="flex:1">
+        <button type="button" class="btn-paste" onclick="pasteIntoEditUrl()" title="Lim inn">📋</button>
+        <a id="edit-open-link" class="link-open-btn" href="" target="_blank" rel="noopener" style="display:none">↗</a>
+      </div>
+    </div>
 
     <div class="modal-row">
       <label>Navn</label>
@@ -157,21 +98,10 @@
     </div>
 
     <div class="modal-row">
-      <label>Status</label>
-      <select id="edit-status">
-        <option value="ser_på">Ser på</option>
-        <option value="ønske">Ønsker</option>
-        <option value="sparer_til">Sparer til</option>
-        <option value="bestilt">Bestilt</option>
-        <option value="kjøpt">Kjøpt</option>
-      </select>
-    </div>
-
-    <div class="modal-row">
       <label>Pris</label>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div class="currency-select-row">
         <input type="number" id="edit-price" placeholder="0" min="0" oninput="updateCurrencyPreview()" style="flex:1">
-        <select id="edit-currency" onchange="updateCurrencyPreview()" style="width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);font-size:13px;cursor:pointer">
+        <select id="edit-currency" onchange="updateCurrencyPreview()">
           <option value="NOK">🇳🇴 kr</option>
           <option value="EUR">🇪🇺 EUR</option>
           <option value="USD">🇺🇸 USD</option>
@@ -180,7 +110,12 @@
           <option value="DKK">🇩🇰 DKK</option>
         </select>
       </div>
-      <div id="currency-preview" style="font-size:12px;color:var(--accent);margin-top:4px;min-height:16px"></div>
+      <div id="currency-preview"></div>
+    </div>
+
+    <div class="modal-row">
+      <label>Status</label>
+      <div class="status-checkboxes" id="status-checkboxes"></div>
     </div>
 
     <div class="modal-row">
@@ -190,15 +125,38 @@
 
     <div class="modal-row">
       <label>Bilde-URL</label>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div class="image-url-row">
         <input type="url" id="edit-image" placeholder="https://..." style="flex:1">
-        <img id="edit-image-preview" src="" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px;display:none;border:1px solid var(--border)">
+        <img id="edit-image-preview" src="" alt="">
       </div>
     </div>
 
     <div class="modal-actions">
-      <button class="btn-secondary" onclick="closeModal()">Avbryt</button>
+      <button class="btn-danger-outline" id="btn-delete" onclick="deleteFromEdit()" style="display:none">Slett</button>
       <button class="btn-primary" onclick="saveEdit()">Lagre</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Savings sheet ── -->
+<div class="modal-overlay" id="spar-overlay" onclick="if(event.target===this)closeSpar()">
+  <div class="modal">
+    <div class="sheet-handle"></div>
+    <div class="spar-eyebrow">Legg til sparing</div>
+    <h3 id="spar-title"></h3>
+    <div class="spar-sub" id="spar-sub"></div>
+    <div class="spar-quick">
+      <button type="button" onclick="sparQuick(100)">+100</button>
+      <button type="button" onclick="sparQuick(250)">+250</button>
+      <button type="button" onclick="sparQuick(500)">+500</button>
+    </div>
+    <div class="modal-row">
+      <label>Eget beløp</label>
+      <input type="number" id="spar-input" placeholder="0" min="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSpar()">Avbryt</button>
+      <button class="btn-primary" id="spar-confirm" onclick="sparConfirm()">Legg til</button>
     </div>
   </div>
 </div>
@@ -214,7 +172,7 @@
             d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364
                L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
     </svg>
-    Liste
+    Ønsker
   </button>
   <button class="nav-btn" id="nav-months" onclick="setView('months')">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -234,50 +192,5 @@
 </nav>
 
 <script src="./app.js"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const container = document.getElementById("cat-checkboxes");
-    CATEGORIES.forEach(c => {
-      container.innerHTML += `
-        <input class="cat-cb" type="checkbox" id="cb-${c}" value="${c}">
-        <label class="cat-label" for="cb-${c}">${c}</label>`;
-    });
-  });
-
-  function setView(v) {
-    view = v;
-    render();
-  }
-
-  function toggleTheme() {
-    const cur = document.documentElement.getAttribute("data-theme");
-    const next = cur === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("hl-theme", next);
-  }
-
-  async function refreshData() {
-    await load();
-    render();
-    toast("Oppdatert");
-  }
-
-  async function handleAdd() {
-    const inp = document.getElementById("add-input");
-    const btn = document.getElementById("btn-add");
-    const url = inp.value.trim();
-    if (!url) return;
-    btn.disabled = true;
-    btn.textContent = "…";
-    await addItem(url);
-    inp.value = "";
-    btn.disabled = false;
-    btn.textContent = "Legg til";
-  }
-
-  document.getElementById("add-input").addEventListener("keydown", e => {
-    if (e.key === "Enter") handleAdd();
-  });
-</script>
 </body>
 </html>

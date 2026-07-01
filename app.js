@@ -4,20 +4,28 @@ const BIN_ID  = "6a1007006877513b27b2fcfe";
 const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 const CATEGORIES = ["Skole", "Klær", "Fritid", "Gym", "Jobb", "Arbeid"];
 const MONTHS = ["Jan","Feb","Mar","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Des"];
-const CAT_CLS = { "Skole": "skole", "Klær": "klar", "Fritid": "fritid", "Gym": "gym", "Jobb": "jobb", "Arbeid": "arbeid" };
 const CAT_ICONS = { "Skole": "🎓", "Klær": "👕", "Fritid": "🎮", "Gym": "🏋️", "Jobb": "💼", "Arbeid": "🔧" };
-const STATUS_ORDER = ["pending","ser_på","ønske","sparer_til","bestilt","kjøpt"];
-const STATUS_NEXT = { ser_på:"ønske", ønske:"sparer_til", sparer_til:"bestilt", bestilt:"kjøpt" };
-const STATUS_LABELS = { pending:"Henter...", ser_på:"Ser på", ønske:"Ønsker", sparer_til:"Sparer til", bestilt:"Bestilt", kjøpt:"Kjøpt" };
-const STATUS_ICONS  = { pending:"⏳", ser_på:"👁", ønske:"♡", sparer_til:"💰", bestilt:"📦", kjøpt:"✓" };
+const EDITABLE_STATUSES = ["ser_på","ønske","sparer_til","bestilt","kjøpt"];
+const STATUS_LABELS = { pending:"Henter...", ser_på:"Ser på", ønske:"Ønske", sparer_til:"Sparer til", bestilt:"Bestilt", kjøpt:"Kjøpt" };
+const STATUS_PILL_CLASS = { ser_på:"sp-onske", ønske:"sp-onske", sparer_til:"sp-sparer", bestilt:"sp-bestilt", kjøpt:"sp-kjopt" };
+const CARD_HEIGHTS = [188, 152, 214, 164];
+const TINTS = [
+  ["#e8ddd0","#ddcfbd"], ["#dbe3d6","#c9d6c0"], ["#dce2ea","#c7d2df"],
+  ["#e6dbe0","#d8c6cf"], ["#e3ded0","#d3ccb5"], ["#d8e0e3","#c2ced2"],
+];
+const CURRENCY_CYCLE = ["NOK","EUR","USD","GBP","SEK","DKK"];
+const THEME_CYCLE = ["warm","skog","skifer","plomme","dark","bw","navy","oldmoney"];
+const THEME_LABELS = { warm:"Varm leire", skog:"Skog", skifer:"Kjølig skifer", plomme:"Plomme", dark:"Mørk antrasitt", bw:"Svart/hvit", navy:"Marineblå", oldmoney:"Old money" };
+const SORT_CYCLE = ["newest","month","price_desc","name","oldest"];
+const SORT_LABELS = { newest:"Nyeste", month:"Måned", price_desc:"Pris", name:"Navn", oldest:"Gamleste" };
 
 // ── State ────────────────────────────────────────────────────────────────────
 let data = { categories: CATEGORIES, items: [] };
 let view = "wishlist";
-let filters = { cat: null, status: null, month: null };
+let filters = { cat: null, status: null };
 let sort = "newest";
 let searchQuery = "";
-let calSelectedMonth = null;
+let displayCurrency = localStorage.getItem("hl-currency") || "NOK";
 
 // ── JSONBin ──────────────────────────────────────────────────────────────────
 const CACHE_KEY = "hl-data-cache";
@@ -36,6 +44,7 @@ async function load() {
     const j = await r.json();
     data = j.record;
     if (!data.items) data.items = [];
+    data.items.forEach(i => { if (typeof i.saved !== "number") i.saved = 0; });
     saveCache(data);
     const offlineBanner = document.getElementById("offline-banner");
     if (offlineBanner) offlineBanner.style.display = "none";
@@ -44,6 +53,7 @@ async function load() {
     if (cached) {
       data = cached;
       if (!data.items) data.items = [];
+      data.items.forEach(i => { if (typeof i.saved !== "number") i.saved = 0; });
       const offlineBanner = document.getElementById("offline-banner");
       if (offlineBanner) offlineBanner.style.display = "block";
     } else {
@@ -115,226 +125,128 @@ async function updateCurrencyPreview() {
   preview.textContent = `≈ ${fmt(nok)} · kurs: 1 ${cur} = ${rate.toFixed(2)} kr`;
 }
 
+function cycleCurrency() {
+  const idx = CURRENCY_CYCLE.indexOf(displayCurrency);
+  displayCurrency = CURRENCY_CYCLE[(idx + 1) % CURRENCY_CYCLE.length];
+  localStorage.setItem("hl-currency", displayCurrency);
+  document.getElementById("currency-pill").textContent = (displayCurrency === "NOK" ? "kr" : displayCurrency) + " ▾";
+  getExchangeRates().then(render);
+  render();
+}
+
+// ── Tema ─────────────────────────────────────────────────────────────────────
+function cycleTheme() {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const idx = THEME_CYCLE.indexOf(cur);
+  const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("hl-theme", next);
+  toast(THEME_LABELS[next]);
+}
+
 // ── Format ───────────────────────────────────────────────────────────────────
-function fmt(price) {
-  if (price == null) return null;
-  return new Intl.NumberFormat("nb-NO").format(price) + " kr";
+function fmt(nok) {
+  if (nok == null) return null;
+  let amount = nok, prefix = "kr";
+  if (displayCurrency !== "NOK" && exchangeRates?.[displayCurrency]) {
+    amount = nok / exchangeRates[displayCurrency];
+    prefix = displayCurrency;
+  }
+  return prefix + " " + new Intl.NumberFormat("nb-NO").format(Math.round(amount));
 }
 function priceDrop(item) {
   const h = item.price_history;
   if (!h || h.length < 2) return false;
   return h[h.length - 1].price < h[h.length - 2].price;
 }
-
-// ── Render helpers ───────────────────────────────────────────────────────────
-function cardImg(item) {
-  if (item.status === "pending") {
-    const domain = (() => { try { return new URL(item.url).hostname.replace("www.",""); } catch { return "?"; } })();
-    return `<div class="card-img-wrap">
-      <div class="placeholder">${domain[0].toUpperCase()}</div>
-      <div class="pending-overlay"><div class="spinner"></div> Henter...</div>
-    </div>`;
-  }
-  if (item.image) {
-    return `<div class="card-img-wrap"><img src="${item.image}" alt="" loading="lazy" onerror="this.parentNode.innerHTML='<div class=placeholder>?</div>'"></div>`;
-  }
-  const domain = (() => { try { return new URL(item.url).hostname.replace("www.",""); } catch { return "?"; } })();
-  return `<div class="card-img-wrap"><div class="placeholder">${domain[0].toUpperCase()}</div></div>`;
+function allCategories() {
+  const set = new Set(CATEGORIES);
+  data.items.forEach(i => (i.categories || []).forEach(c => set.add(c)));
+  return [...set].sort((a, b) => a.localeCompare(b, "nb"));
+}
+function tintFor(id) {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return TINTS[h % TINTS.length];
+}
+function cardImgError(img, tintA, tintB) {
+  const div = document.createElement("div");
+  div.className = "placeholder";
+  div.style.setProperty("--tintA", tintA);
+  div.style.setProperty("--tintB", tintB);
+  div.innerHTML = "<span>bilde</span>";
+  img.replaceWith(div);
 }
 
-function renderCard(item) {
-  const drop = priceDrop(item);
+// ── VareKort ─────────────────────────────────────────────────────────────────
+function renderCard(item, index, archived = false) {
+  const h = CARD_HEIGHTS[index % CARD_HEIGHTS.length];
+  const [tintA, tintB] = tintFor(item.id);
+  let imgHtml;
+  if (item.image) {
+    imgHtml = `<img src="${item.image}" alt="" loading="lazy" onerror="cardImgError(this,'${tintA}','${tintB}')">`;
+  } else {
+    imgHtml = `<div class="placeholder" style="--tintA:${tintA};--tintB:${tintB}"><span>bilde</span></div>`;
+  }
+  const pillCls = STATUS_PILL_CLASS[item.status] || "sp-onske";
+  const cats = (item.categories || []).join(" · ");
+  const meta = [cats, item.month].filter(Boolean).join(" · ") || "—";
   const priceHtml = item.price_current
     ? `<div class="card-price">${fmt(item.price_current)}</div>`
-    : `<div class="card-price no-price">${item.status === "pending" ? "—" : item.utsolgt ? "Utsolgt" : "Ingen pris"}</div>`;
-  const monthHtml = item.month
-    ? `<div class="card-month">📅 ${item.month}</div>` : "";
+    : `<div class="card-price no-price">${item.utsolgt ? "Utsolgt" : "Ingen pris"}</div>`;
 
-  // Only show badge for statuses above "ønske" (sparer_til, bestilt)
-  const showBadge = item.status === "sparer_til" || item.status === "bestilt";
-  const statusBadge = showBadge ? `
-    <div class="status-badge">
-      <span class="status-dot-sm sd-${item.status === "sparer_til" ? "sparer" : item.status}"></span>
-      ${STATUS_ICONS[item.status]} ${STATUS_LABELS[item.status]}
-    </div>` : "";
+  let saveHtml = "";
+  if (item.status === "sparer_til" && item.price_current) {
+    const pct = Math.min(100, Math.round(((item.saved || 0) / item.price_current) * 100));
+    saveHtml = `<div class="save-row">
+        <div class="save-track"><div class="save-fill" style="width:${pct}%"></div></div>
+        <div class="save-pct">${pct}%</div>
+      </div>
+      <button type="button" class="btn-spar" onclick="event.stopPropagation();openSpar('${item.id}')">+ Spar</button>`;
+  }
 
-  const imgHtml = cardImg(item);
-  const clickable = item.status !== "pending";
+  const dropHtml = priceDrop(item) ? `<div class="price-drop-badge">↓</div>` : "";
 
-  return `<div class="card${clickable ? " card-tappable" : ""}" data-id="${item.id}"${clickable ? ` onclick="openDetail('${item.id}')"` : ""}>
-    ${drop ? '<div class="price-drop">↓ Prisfall</div>' : ""}
-    ${statusBadge}
-    ${imgHtml}
+  return `<div class="card${archived ? " card-archived" : ""}" onclick="openEdit('${item.id}')">
+    <div class="card-img-wrap" style="height:${h}px">${imgHtml}</div>
+    <div class="status-pill ${pillCls}">${STATUS_LABELS[item.status]}</div>
+    ${dropHtml}
     <div class="card-body">
       <div class="card-name">${item.name || item.url}</div>
+      <div class="card-meta">${meta}</div>
+      ${saveHtml}
       ${priceHtml}
-      ${monthHtml}
     </div>
   </div>`;
 }
 
-// ── Product detail sheet ──────────────────────────────────────────────────────
-let detailId = null;
-
-function openDetail(id) {
-  const item = data.items.find(i => i.id === id);
-  if (!item || item.status === "pending") return;
-  detailId = id;
-
-  const overlay = document.getElementById("detail-overlay");
-
-  // Image
-  const imgEl = overlay.querySelector(".detail-img");
-  if (item.image) {
-    imgEl.innerHTML = `<img src="${item.image}" alt="" onerror="this.style.display='none'">`;
-  } else {
-    const initial = (() => { try { return new URL(item.url).hostname.replace("www.","")[0].toUpperCase(); } catch { return "?"; } })();
-    imgEl.innerHTML = `<div class="detail-img-placeholder">${initial}</div>`;
-  }
-
-  // Name
-  overlay.querySelector(".detail-name").textContent = item.name || item.url;
-
-  // Price
-  const priceEl = overlay.querySelector(".detail-price");
-  if (item.price_current) {
-    const h = item.price_history;
-    let changeHtml = "";
-    if (h && h.length >= 2) {
-      const prev = h[h.length - 2].price;
-      const curr = h[h.length - 1].price;
-      const diff = curr - prev;
-      if (diff !== 0) {
-        const pct = Math.abs(Math.round((diff / prev) * 100));
-        changeHtml = `<span class="detail-price-change ${diff < 0 ? 'down' : 'up'}">${diff < 0 ? '↓' : '↑'} ${pct}%</span>`;
-      }
-    }
-    priceEl.innerHTML = `<span class="detail-price-amount">${fmt(item.price_current)}</span>${changeHtml}`;
-  } else {
-    priceEl.innerHTML = `<span class="detail-no-price">Ingen pris</span>`;
-  }
-
-  // Categories
-  const catsEl = overlay.querySelector(".detail-cats");
-  const cats = (item.categories || []);
-  catsEl.innerHTML = cats.map(c =>
-    `<span class="detail-cat">${CAT_ICONS[c] || ""} ${c}</span>`
-  ).join("");
-  catsEl.style.display = cats.length ? "flex" : "none";
-
-  // Notes
-  const notesEl = overlay.querySelector(".detail-notes");
-  notesEl.textContent = item.notes || "";
-  notesEl.style.display = item.notes ? "block" : "none";
-
-  // Status buttons
-  const statusRow = overlay.querySelector(".detail-status-row");
-  const statuses = ["ser_på","ønske","sparer_til","bestilt","kjøpt"];
-  statusRow.innerHTML = statuses.map(s => {
-    const isActive = item.status === s;
-    const cls = s.replace("_","-");
-    return `<button class="detail-status-btn detail-status-${cls}${isActive ? " active" : ""}"
-      onclick="setItemStatus('${item.id}','${s}')">${STATUS_ICONS[s]} ${STATUS_LABELS[s]}</button>`;
-  }).join("");
-
-  // URL button
-  overlay.querySelector(".detail-url-btn").href = item.url;
-
-  // Image tappable to open URL
-  const imgWrap = overlay.querySelector(".detail-img-wrap");
-  imgWrap.onclick = (e) => {
-    if (e.target.closest(".detail-close")) return;
-    window.open(item.url, "_blank", "noopener");
-  };
-
-  overlay.classList.add("open");
-  // Prevent body scroll
-  document.body.style.overflow = "hidden";
-}
-
-function closeDetail() {
-  document.getElementById("detail-overlay").classList.remove("open");
-  document.body.style.overflow = "";
-  detailId = null;
-}
-
-async function setItemStatus(id, newStatus) {
-  const item = data.items.find(i => i.id === id);
-  if (!item) return;
-  item.status = newStatus;
-  if (newStatus === "kjøpt" && !item.purchased_at) item.purchased_at = new Date().toISOString();
-
-  // Update status buttons in the open detail sheet without closing
-  const overlay = document.getElementById("detail-overlay");
-  if (overlay.classList.contains("open") && detailId === id) {
-    overlay.querySelectorAll(".detail-status-btn").forEach(btn => btn.classList.remove("active"));
-    const cls = newStatus.replace("_","-");
-    overlay.querySelector(`.detail-status-${cls}`)?.classList.add("active");
-  }
-
-  render();
-  await save();
-  toast(STATUS_LABELS[newStatus]);
-}
-
-function openEditFromDetail() {
-  const id = detailId;
-  closeDetail();
-  setTimeout(() => openEdit(id), 60);
-}
-
-async function deleteFromDetail() {
-  if (!detailId) return;
-  const id = detailId;
-  closeDetail();
-  await deleteItem(id);
-}
-
 // ── Views ────────────────────────────────────────────────────────────────────
 function activeItems() {
-  return data.items.filter(i => i.status !== "kjøpt");
+  return data.items.filter(i => i.status !== "kjøpt" && i.status !== "pending");
 }
 function filteredItems() {
   const q = searchQuery.trim().toLowerCase();
   const items = activeItems().filter(i => {
-    if (i.status === "pending") return false;
     if (filters.cat && !(i.categories || []).includes(filters.cat)) return false;
     if (filters.status && i.status !== filters.status) return false;
-    if (filters.month && i.month !== filters.month) return false;
     if (q && !((i.name || "") + (i.url || "") + (i.notes || "")).toLowerCase().includes(q)) return false;
     return true;
   });
   return items.sort((a, b) => {
-    if (sort === "price_asc")  return (a.price_current || Infinity) - (b.price_current || Infinity);
+    if (sort === "month") {
+      const ai = a.month ? MONTHS.indexOf(a.month) : 99, bi = b.month ? MONTHS.indexOf(b.month) : 99;
+      return ai - bi;
+    }
     if (sort === "price_desc") return (b.price_current || 0) - (a.price_current || 0);
     if (sort === "name")       return (a.name || "").localeCompare(b.name || "", "nb");
     if (sort === "oldest")     return new Date(a.added_at || 0) - new Date(b.added_at || 0);
     return new Date(b.added_at || 0) - new Date(a.added_at || 0);
   });
 }
-
-function renderNextPurchase() {
-  const bar = document.getElementById("next-purchase-bar");
-  if (!bar) return;
-  if (view !== "wishlist") { bar.innerHTML = ""; return; }
-  const candidates = activeItems().filter(i => i.month && i.status !== "pending" && i.price_current);
-  if (!candidates.length) { bar.innerHTML = ""; return; }
-  const sorted = candidates.slice().sort((a, b) => MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month));
-  const next = sorted[0];
-  const imgHtml = next.image
-    ? `<img src="${next.image}" alt="" onerror="this.style.display='none'">`
-    : `<span>${(next.name || "?")[0].toUpperCase()}</span>`;
-  bar.innerHTML = `<div class="next-purchase" onclick="openPurchasePlan()">
-    <div class="next-img">${imgHtml}</div>
-    <div class="next-info">
-      <div class="next-label">⏳ Neste kjøp — ${next.month}</div>
-      <div class="next-name">${next.name || next.url}</div>
-      <div class="next-month">${STATUS_LABELS[next.status] || next.status} · ${(next.categories || []).join(" · ")}</div>
-    </div>
-    <div class="next-price-col">
-      <div class="next-price">${fmt(next.price_current)}</div>
-    </div>
-  </div>`;
+function cycleSort() {
+  const idx = SORT_CYCLE.indexOf(sort);
+  sort = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length];
+  render();
 }
 
 function renderPendingBar() {
@@ -361,262 +273,142 @@ function renderPendingBar() {
   </div>`;
 }
 
+function renderFilters() {
+  const bar = document.getElementById("filter-bar");
+  const active = activeItems();
+  const catCounts = {};
+  allCategories().forEach(c => { catCounts[c] = active.filter(i => (i.categories || []).includes(c)).length; });
+
+  const catChips = [`<button type="button" class="chip ${!filters.cat ? "active" : ""}" onclick="toggleCat(null)">Alle <span class="chip-count">${active.length}</span></button>`]
+    .concat(allCategories().filter(c => catCounts[c] > 0 || filters.cat === c).map(c =>
+      `<button type="button" class="chip ${filters.cat === c ? "active" : ""}" onclick="toggleCat('${c}')">${CAT_ICONS[c] ? CAT_ICONS[c] + " " : ""}${c} <span class="chip-count">${catCounts[c]}</span></button>`
+    )).join("");
+
+  const statusOptions = [
+    { key: null,         label: "Alle" },
+    { key: "ser_på",     label: "Ser på" },
+    { key: "ønske",      label: "Ønske" },
+    { key: "sparer_til", label: "Sparer til" },
+    { key: "bestilt",    label: "Bestilt" },
+  ];
+  const statusChips = statusOptions.map(s =>
+    `<button type="button" class="chip ${filters.status === s.key ? "active" : ""}" onclick="toggleStatus(${s.key ? `'${s.key}'` : "null"})">${s.label}</button>`
+  ).join("");
+
+  bar.innerHTML = `
+    <div class="filter-area">
+      <div class="search-sort-row">
+        <div class="search-bar">
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="search-input" type="text" placeholder="Søk i ønsker" value="${searchQuery}" oninput="setSearch(this.value)" autocomplete="off" autocorrect="off">
+        </div>
+        <button type="button" class="sort-toggle" onclick="cycleSort()">${SORT_LABELS[sort]} ▾</button>
+      </div>
+      <div class="chip-row">${catChips}</div>
+      <div class="chip-row chip-row-secondary">${statusChips}</div>
+    </div>`;
+}
+function toggleCat(val) { filters.cat = (val === null || filters.cat === val) ? null : val; render(); }
+function toggleStatus(val) { filters.status = (val === null || filters.status === val) ? null : val; render(); }
+function setSearch(q) { searchQuery = q; renderWishlist(); }
+
 function renderWishlist() {
   const items = filteredItems();
   const main = document.getElementById("main");
-  const isFiltered = filters.cat || filters.status || searchQuery.trim();
-  const isDateSort = sort === "newest" || sort === "oldest";
-
   if (!items.length) {
-    main.innerHTML = `<div class="empty"><div class="empty-icon">🛒</div>
-      <p>Ingen varer her ennå.<br>Lim inn en lenke øverst for å legge til.</p></div>`;
+    main.innerHTML = `<div class="empty"><div class="empty-icon">🛒</div><p>Ingen treff.</p></div>`;
     return;
   }
-
-  if (isFiltered || isDateSort) {
-    main.innerHTML = `<div class="grid">${items.map(renderCard).join("")}</div>`;
-    return;
-  }
-
-  let html = "";
-  const shown = new Set();
-
-  CATEGORIES.forEach(cat => {
-    const catItems = items.filter(i => (i.categories || []).includes(cat));
-    if (!catItems.length) return;
-    catItems.forEach(i => shown.add(i.id));
-    const total = catItems.reduce((s, i) => s + (i.price_current || 0), 0);
-    html += `<div class="section">
-      <div class="section-header">
-        <div class="section-title"><span class="section-title-icon">${CAT_ICONS[cat]}</span>${cat}</div>
-        ${total ? `<div class="section-total">${fmt(total)}</div>` : ""}
-      </div>
-      <div class="grid">${catItems.map(renderCard).join("")}</div>
-    </div>`;
-  });
-
-  const rest = items.filter(i => !shown.has(i.id));
-  if (rest.length) {
-    const total = rest.reduce((s, i) => s + (i.price_current || 0), 0);
-    html += `<div class="section">
-      <div class="section-header">
-        <div class="section-title"><span class="section-title-icon">📦</span>Andre</div>
-        ${total ? `<div class="section-total">${fmt(total)}</div>` : ""}
-      </div>
-      <div class="grid">${rest.map(renderCard).join("")}</div>
-    </div>`;
-  }
-
-  main.innerHTML = html;
+  main.innerHTML = `<div class="gallery">${items.map((it, idx) => renderCard(it, idx)).join("")}</div>`;
 }
 
 function renderMonths() {
-  const items = activeItems().filter(i => i.status !== "pending" && i.month);
+  const items = activeItems();
   const byMonth = {};
   MONTHS.forEach(m => { byMonth[m] = []; });
-  items.forEach(i => { if (byMonth[i.month]) byMonth[i.month].push(i); });
+  const noMonth = [];
+  items.forEach(i => { if (i.month && byMonth[i.month]) byMonth[i.month].push(i); else if (!i.month) noMonth.push(i); });
 
-  const calCards = MONTHS.map(m => {
+  let html = "";
+  MONTHS.forEach(m => {
     const list = byMonth[m];
-    const total = list.reduce((s, i) => s + (i.price_current || 0), 0);
-    const hasItems = list.length > 0;
-    const isSelected = calSelectedMonth === m && hasItems;
-
-    const thumbs = list.slice(0, 3).map(i =>
-      i.image
-        ? `<img class="cal-thumb" src="${i.image}" alt="" loading="lazy" onerror="this.style.display='none'">`
-        : `<div class="cal-thumb cal-thumb-letter">${(i.name || "?")[0]}</div>`
-    ).join("");
-
-    return `<div class="cal-card ${hasItems ? "cal-has" : "cal-empty"}${isSelected ? " cal-selected" : ""}"
-      ${hasItems ? `onclick="calSelect('${m}')"` : ""}>
-      <div class="cal-mname">${m}</div>
-      ${hasItems
-        ? `<div class="cal-thumbs">${thumbs}</div>
-           <div class="cal-meta">
-             <span class="cal-count">${list.length}×</span>
-             <span class="cal-total">${fmt(total)}</span>
-           </div>`
-        : `<div class="cal-none">·</div>`}
+    if (!list.length) return;
+    const sorted = list.slice().sort((a, b) => (b.price_current || 0) - (a.price_current || 0));
+    const total = sorted.reduce((s, i) => s + (i.price_current || 0), 0);
+    html += `<div class="month-group">
+      <div class="month-header"><span>${m}</span><span>${fmt(total)}</span></div>
+      <div class="gallery">${sorted.map((it, idx) => renderCard(it, idx)).join("")}</div>
     </div>`;
-  }).join("");
-
-  const selectedList = calSelectedMonth ? (byMonth[calSelectedMonth] || []) : [];
-  const detailHtml = selectedList.length
-    ? `<div class="cal-detail">
-        <div class="cal-detail-header">
-          <span>${calSelectedMonth}</span>
-          <span>${fmt(selectedList.reduce((s, i) => s + (i.price_current || 0), 0))}</span>
-        </div>
-        <div class="cal-detail-grid">${selectedList.map(renderCard).join("")}</div>
-      </div>`
-    : "";
-
-  document.getElementById("main").innerHTML = `<div class="cal-wrap">
-    <div class="cal-grid">${calCards}</div>
-    ${detailHtml}
-  </div>`;
-}
-
-function calSelect(m) {
-  calSelectedMonth = calSelectedMonth === m ? null : m;
-  renderMonths();
+  });
+  if (noMonth.length) {
+    const sorted = noMonth.slice().sort((a, b) => (b.price_current || 0) - (a.price_current || 0));
+    const total = sorted.reduce((s, i) => s + (i.price_current || 0), 0);
+    html += `<div class="month-group">
+      <div class="month-header"><span>Uten måned</span><span>${fmt(total)}</span></div>
+      <div class="gallery">${sorted.map((it, idx) => renderCard(it, idx)).join("")}</div>
+    </div>`;
+  }
+  document.getElementById("main").innerHTML = html ||
+    `<div class="empty"><div class="empty-icon">📅</div><p>Ingen planlagte kjøp ennå.</p></div>`;
 }
 
 function renderArchive() {
   const items = data.items.filter(i => i.status === "kjøpt");
-  const yearTotal = items.reduce((s, i) => s + (i.price_current || 0), 0);
-
   if (!items.length) {
     document.getElementById("main").innerHTML =
-      `<div class="empty"><div class="empty-icon">✅</div><p>Ingen kjøpte varer ennå.</p></div>`;
+      `<div class="empty"><div class="empty-icon">✅</div><p>Ingenting kjøpt ennå.</p></div>`;
     return;
   }
-
-  const rows = items.map(i => {
-    const thumbHtml = i.image
-      ? `<div class="archive-thumb"><img src="${i.image}" alt="" onerror="this.parentNode.innerHTML='?'"></div>`
-      : `<div class="archive-thumb">${(i.name || "?")[0].toUpperCase()}</div>`;
-    return `<div class="archive-item">
-      ${thumbHtml}
-      <div class="archive-info">
-        <div class="archive-name">${i.name || i.url}</div>
-        <div class="archive-date">${i.purchased_at ? i.purchased_at.slice(0,10) : ""}</div>
-      </div>
-      <div class="archive-price">${fmt(i.price_current) || "—"}</div>
-    </div>`;
-  }).join("");
-
-  document.getElementById("main").innerHTML = `<div class="archive-view">
-    <div class="archive-header">
-      <span>Kjøpt i ${new Date().getFullYear()}</span>
-      <span style="color:var(--success)">${fmt(yearTotal)}</span>
-    </div>
-    ${rows}
-  </div>`;
+  document.getElementById("main").innerHTML =
+    `<div class="gallery">${items.map((it, idx) => renderCard(it, idx, true)).join("")}</div>`;
 }
 
 function renderTotals() {
-  const active = activeItems().filter(i => i.status !== "pending");
+  const active = activeItems();
   const total = active.reduce((s, i) => s + (i.price_current || 0), 0);
-
   const byCat = {};
-  CATEGORIES.forEach(c => { byCat[c] = 0; });
+  allCategories().forEach(c => { byCat[c] = 0; });
   active.forEach(i => (i.categories || []).forEach(c => { if (byCat[c] != null) byCat[c] += i.price_current || 0; }));
 
   let html = `<div class="total-chip">Totalt: <span>${fmt(total)}</span></div>`;
-  CATEGORIES.forEach(c => {
+  allCategories().forEach(c => {
     if (byCat[c] > 0) html += `<div class="total-chip">${c}: <span>${fmt(byCat[c])}</span></div>`;
   });
   document.getElementById("totals-bar").innerHTML = html;
 }
 
-function _attachHScroll(el) {
-  let startX = 0, startY = 0, startLeft = 0, decided = false, isHorz = false;
-  el.addEventListener("touchstart", e => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    startLeft = el.scrollLeft;
-    decided = false; isHorz = false;
-  }, { passive: true });
-  el.addEventListener("touchmove", e => {
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    if (!decided) { decided = true; isHorz = Math.abs(dx) > Math.abs(dy); }
-    if (isHorz) { e.preventDefault(); el.scrollLeft = startLeft - dx; }
-  }, { passive: false });
-}
-
-function renderFilters() {
-  const bar = document.getElementById("filter-bar");
-  const prevCatScroll = bar.querySelector(".cat-tabs")?.scrollLeft ?? 0;
-  const prevRowScroll = bar.querySelector(".filter-row")?.scrollLeft ?? 0;
-
-  const catTabs = [{ key: null, icon: "✨", label: "Alle" }, ...CATEGORIES.map(c => ({ key: c, icon: CAT_ICONS[c], label: c }))]
-    .map(t => `<button type="button" class="cat-tab ${filters.cat === t.key ? "active" : ""}" onclick="toggleCat(${t.key ? `'${t.key}'` : 'null'})">
-      <span class="cat-tab-icon">${t.icon}</span>${t.label}
-    </button>`).join("");
-
-  const statusPills = [
-    { key: null,          cls: "pill-all",     label: "Alle" },
-    { key: "ser_på",      cls: "pill-serpa",   label: "Ser på" },
-    { key: "ønske",       cls: "pill-onske",   label: "Ønsker" },
-    { key: "sparer_til",  cls: "pill-sparer",  label: "Sparer til" },
-    { key: "bestilt",     cls: "pill-bestilt", label: "Bestilt" },
-  ].map(p => `<button type="button" class="fpill ${p.cls} ${filters.status === p.key ? "active" : ""}" onclick="toggleFilter('status',${p.key ? `'${p.key}'` : 'null'})">
-    <span class="fpill-dot"></span>${p.label}
-  </button>`).join("");
-
-  const sortPills = [
-    { key: "newest", label: "Nyeste" }, { key: "oldest", label: "Gamleste" },
-    { key: "price_asc", label: "Billigst" }, { key: "price_desc", label: "Dyreste" },
-    { key: "name", label: "A–Å" },
-  ].map(s => `<button type="button" class="fpill fpill-sort ${sort === s.key ? "active" : ""}" onclick="setSort('${s.key}')">${sort === s.key ? "✓ " : ""}${s.label}</button>`).join("");
-
-  bar.innerHTML = `
-    <div class="filter-area">
-      <div class="search-bar">
-        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input class="search-input" type="text" placeholder="Søk…" value="${searchQuery}" oninput="setSearch(this.value)" autocomplete="off" autocorrect="off">
-      </div>
-      <div class="cat-tabs">${catTabs}</div>
-      <div class="filter-row">${statusPills}<span class="pill-sep">↕</span>${sortPills}</div>
-    </div>`;
-
-  bar.querySelector(".cat-tabs").scrollLeft = prevCatScroll;
-  bar.querySelector(".filter-row").scrollLeft = prevRowScroll;
-  _attachHScroll(bar.querySelector(".cat-tabs"));
-  _attachHScroll(bar.querySelector(".filter-row"));
-}
-
-function toggleFilter(key, val) {
-  filters[key] = (val === null || filters[key] === val) ? null : val;
-  render();
-}
-function toggleCat(val) {
-  filters.cat = (val === null || filters.cat === val) ? null : val;
-  render();
-}
-function clearFilters() {
-  filters = { cat: null, status: null, month: null };
-  searchQuery = "";
-  render();
-}
-function setSort(key) {
-  sort = key;
-  render();
-}
-function setSearch(q) {
-  searchQuery = q;
-  renderWishlist();
-}
-
 function render() {
   renderTotals();
-  renderNextPurchase();
-  renderFilters();
-  renderPendingBar();
-  if (view === "wishlist") renderWishlist();
-  else if (view === "months") renderMonths();
-  else renderArchive();
-
+  const showListChrome = view === "wishlist";
+  document.querySelector(".add-bar").style.display = showListChrome ? "flex" : "none";
+  document.querySelector(".add-extra").style.display = showListChrome ? "flex" : "none";
+  if (showListChrome) {
+    renderPendingBar();
+    renderFilters();
+    renderWishlist();
+  } else {
+    document.getElementById("pending-bar").innerHTML = "";
+    document.getElementById("filter-bar").innerHTML = "";
+    if (view === "months") renderMonths(); else renderArchive();
+  }
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
   document.getElementById(`nav-${view}`).classList.add("active");
 }
+function setView(v) { view = v; render(); }
 
-// ── Add item ─────────────────────────────────────────────────────────────────
+// ── Legg til (lim inn lenke) ───────────────────────────────────────────────────
 async function addItem(url) {
   url = url.trim();
   if (!url || !url.startsWith("http")) { toast("Lim inn en gyldig URL", true); return; }
   if (data.items.find(i => i.url === url)) { toast("Lenken er allerede i lista"); return; }
 
-  const manualName     = document.getElementById("add-name").value.trim();
-  const priceRaw       = parseFloat(document.getElementById("add-price").value) || null;
-  const addCur         = document.getElementById("add-currency")?.value || "NOK";
-  const manualPrice    = priceRaw
+  const manualName  = document.getElementById("add-name").value.trim();
+  const priceRaw    = parseFloat(document.getElementById("add-price").value) || null;
+  const addCur      = document.getElementById("add-currency")?.value || "NOK";
+  const manualPrice = priceRaw
     ? (addCur === "NOK" ? Math.round(priceRaw) : (toNok(priceRaw, addCur) ?? Math.round(priceRaw)))
     : null;
-  const now         = new Date().toISOString();
+  const now = new Date().toISOString();
 
   const item = {
     id: uuid(), url,
@@ -625,7 +417,7 @@ async function addItem(url) {
     image:  null,
     price_current: manualPrice,
     price_history: manualPrice ? [{ date: now.slice(0,10), price: manualPrice }] : [],
-    currency: "NOK",
+    currency: "NOK", saved: 0,
     categories: [], subcategory: "", month: null, notes: "",
     last_error: null, added_at: now, purchased_at: null,
   };
@@ -640,15 +432,36 @@ async function addItem(url) {
     toast("Lagringsfeil: " + e.message, true);
   }
 }
-
-// ── Item actions ─────────────────────────────────────────────────────────────
-async function nextStatus(id) {
-  const item = data.items.find(i => i.id === id);
-  if (!item || !STATUS_NEXT[item.status]) return;
-  item.status = STATUS_NEXT[item.status];
-  if (item.status === "kjøpt") item.purchased_at = new Date().toISOString();
-  render();
-  await save();
+async function handleAdd() {
+  const inp = document.getElementById("add-input");
+  const btn = document.getElementById("btn-add");
+  const url = inp.value.trim();
+  if (!url) return;
+  btn.disabled = true;
+  btn.textContent = "…";
+  await addItem(url);
+  inp.value = "";
+  btn.disabled = false;
+  btn.textContent = "Legg til";
+}
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text || !text.startsWith("http")) { toast("Ingen lenke i utklippstavlen", true); return; }
+    document.getElementById("add-input").value = text;
+    toast("Lenke limt inn — trykk Legg til");
+  } catch {
+    toast("Kunne ikke lese utklippstavlen", true);
+  }
+}
+async function pasteIntoEditUrl() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text || !text.startsWith("http")) { toast("Ingen lenke i utklippstavlen", true); return; }
+    document.getElementById("edit-url").value = text;
+  } catch {
+    toast("Kunne ikke lese utklippstavlen", true);
+  }
 }
 
 async function deleteItem(id) {
@@ -658,70 +471,54 @@ async function deleteItem(id) {
   toast("Slettet");
 }
 
-// ── Purchase plan panel ───────────────────────────────────────────────────────
-function openPurchasePlan() {
-  const candidates = activeItems().filter(i => i.month && i.status !== "pending");
-  const sorted = candidates.slice().sort((a, b) => MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month));
-  const total = sorted.reduce((s, i) => s + (i.price_current || 0), 0);
-
-  const byMonth = {};
-  sorted.forEach(i => {
-    if (!byMonth[i.month]) byMonth[i.month] = [];
-    byMonth[i.month].push(i);
-  });
-
-  let html = "";
-  Object.keys(byMonth).forEach(m => {
-    const list = byMonth[m];
-    const mTotal = list.reduce((s, i) => s + (i.price_current || 0), 0);
-    html += `<div class="plan-month-header">
-      <span>📅 ${m}</span>
-      <span class="plan-month-total">${mTotal ? fmt(mTotal) : ""}</span>
-    </div>`;
-    list.forEach(item => {
-      const imgHtml = item.image
-        ? `<img src="${item.image}" alt="" onerror="this.parentNode.innerHTML='<span>${(item.name||"?")[0]}</span>'">`
-        : `<span>${(item.name || "?")[0].toUpperCase()}</span>`;
-      const statusDot = !["ser_på","ønske"].includes(item.status)
-        ? `<span class="plan-dot sd-${item.status === "sparer_til" ? "sparer" : item.status}"></span>`
-        : "";
-      html += `<div class="plan-item" onclick="closePurchasePlan();openDetail('${item.id}')">
-        <div class="plan-thumb">${imgHtml}</div>
-        <div class="plan-info">
-          <div class="plan-name">${item.name || item.url}</div>
-          <div class="plan-meta">${statusDot}${STATUS_LABELS[item.status] || item.status}</div>
-        </div>
-        <div class="plan-price">${item.price_current ? fmt(item.price_current) : "—"}</div>
-      </div>`;
-    });
-  });
-
-  document.getElementById("plan-total").textContent = total ? `Totalt: ${fmt(total)}` : "";
-  document.getElementById("plan-list").innerHTML = html ||
-    `<div style="text-align:center;padding:40px;color:var(--subtext)">Ingen planlagte kjøp</div>`;
-  document.getElementById("plan-overlay").classList.add("open");
-}
-
-function closePurchasePlan() {
-  document.getElementById("plan-overlay").classList.remove("open");
-}
-
-// ── Edit modal ────────────────────────────────────────────────────────────────
+// ── Ny vare / Rediger vare (bunnark) ───────────────────────────────────────────
 let editId = null;
+
+function buildCategoryChips(selected) {
+  document.getElementById("cat-checkboxes").innerHTML = allCategories().map(c => `
+    <input class="cat-cb" type="checkbox" id="cb-${c}" value="${c}" ${selected.includes(c) ? "checked" : ""}>
+    <label class="cat-label" for="cb-${c}">${CAT_ICONS[c] ? CAT_ICONS[c] + " " : ""}${c}</label>`).join("");
+}
+function buildStatusChips(current) {
+  document.getElementById("status-checkboxes").innerHTML = EDITABLE_STATUSES.map(s => `
+    <input class="status-cb" type="radio" name="status-radio" id="sb-${s}" value="${s}" ${current === s ? "checked" : ""}>
+    <label class="status-label" for="sb-${s}">${STATUS_LABELS[s]}</label>`).join("");
+}
+
+function openAdd() {
+  editId = null;
+  document.getElementById("edit-title").textContent = "Ny vare";
+  document.getElementById("edit-url").value = "";
+  document.getElementById("edit-open-link").style.display = "none";
+  document.getElementById("edit-name").value = "";
+  document.getElementById("edit-month").value = "";
+  document.getElementById("edit-notes").value = "";
+  document.getElementById("edit-price").value = "";
+  document.getElementById("edit-currency").value = "NOK";
+  document.getElementById("currency-preview").textContent = "";
+  document.getElementById("edit-image").value = "";
+  document.getElementById("edit-image-preview").style.display = "none";
+  document.getElementById("btn-delete").style.display = "none";
+  buildCategoryChips([]);
+  buildStatusChips("ser_på");
+  document.getElementById("modal-overlay").classList.add("open");
+}
+
 function openEdit(id) {
   const item = data.items.find(i => i.id === id);
   if (!item) return;
   editId = id;
-
+  document.getElementById("edit-title").textContent = "Rediger vare";
+  document.getElementById("edit-url").value = item.url || "";
+  const openLink = document.getElementById("edit-open-link");
+  if (item.url) { openLink.href = item.url; openLink.style.display = "flex"; }
+  else openLink.style.display = "none";
   document.getElementById("edit-name").value  = item.name || "";
   document.getElementById("edit-price").value = item.price_current || "";
-  document.getElementById("edit-month").value  = item.month || "";
-  document.getElementById("edit-notes").value  = item.notes || "";
-  document.getElementById("edit-status").value = item.status;
-  const curSel = document.getElementById("edit-currency");
-  if (curSel) curSel.value = "NOK";
-  const preview = document.getElementById("currency-preview");
-  if (preview) preview.textContent = "";
+  document.getElementById("edit-month").value = item.month || "";
+  document.getElementById("edit-notes").value = item.notes || "";
+  document.getElementById("edit-currency").value = "NOK";
+  document.getElementById("currency-preview").textContent = "";
   const imgInput = document.getElementById("edit-image");
   const imgPreview = document.getElementById("edit-image-preview");
   imgInput.value = item.image || "";
@@ -732,12 +529,9 @@ function openEdit(id) {
     if (v.startsWith("http")) { imgPreview.src = v; imgPreview.style.display = "block"; }
     else imgPreview.style.display = "none";
   };
-
-  CATEGORIES.forEach(c => {
-    const cb = document.getElementById("cb-" + c);
-    if (cb) cb.checked = (item.categories || []).includes(c);
-  });
-
+  document.getElementById("btn-delete").style.display = "block";
+  buildCategoryChips(item.categories || []);
+  buildStatusChips(item.status === "pending" ? "ser_på" : item.status);
   document.getElementById("modal-overlay").classList.add("open");
 }
 
@@ -747,30 +541,114 @@ function closeModal() {
 }
 
 async function saveEdit() {
+  const name  = document.getElementById("edit-name").value.trim();
+  const url   = document.getElementById("edit-url").value.trim();
+  const month = document.getElementById("edit-month").value || null;
+  const notes = document.getElementById("edit-notes").value.trim();
+  const statusEl = document.querySelector('input[name="status-radio"]:checked');
+  const status = statusEl ? statusEl.value : "ser_på";
+  const rawPrice = parseFloat(document.getElementById("edit-price").value);
+  const cur      = document.getElementById("edit-currency")?.value || "NOK";
+  const newPrice = rawPrice ? (cur === "NOK" ? Math.round(rawPrice) : toNok(rawPrice, cur)) : null;
+  const cats  = allCategories().filter(c => document.getElementById("cb-" + c)?.checked);
+  const imgVal = document.getElementById("edit-image").value.trim();
+
+  if (editId == null) {
+    if (!name && !url) { closeModal(); return; }
+    if (url && data.items.find(i => i.url === url)) { toast("Lenken er allerede i lista"); return; }
+    const now = new Date().toISOString();
+    const item = {
+      id: uuid(), url: url || "",
+      status: url && !name ? "pending" : status,
+      name: name || null,
+      image: imgVal && imgVal.startsWith("http") ? imgVal : null,
+      price_current: newPrice,
+      price_history: newPrice ? [{ date: now.slice(0,10), price: newPrice }] : [],
+      currency: "NOK", saved: 0,
+      categories: cats, subcategory: "", month, notes,
+      last_error: null, added_at: now, purchased_at: status === "kjøpt" ? now : null,
+    };
+    data.items.unshift(item);
+    closeModal();
+    render();
+    try {
+      await save();
+      toast(item.status === "pending" ? "Lagt til! Henter info automatisk…" : "Lagt til!");
+    } catch (e) {
+      toast("Lagringsfeil: " + e.message, true);
+    }
+    return;
+  }
+
   const item = data.items.find(i => i.id === editId);
   if (!item) return;
-  item.name   = document.getElementById("edit-name").value.trim() || item.name;
-  item.month  = document.getElementById("edit-month").value || null;
-  item.notes  = document.getElementById("edit-notes").value.trim();
-  item.status = document.getElementById("edit-status").value;
-  const newImg = document.getElementById("edit-image").value.trim();
-  if (newImg && newImg.startsWith("http")) item.image = newImg;
-  else if (!newImg) item.image = null;
-  const rawPrice  = parseFloat(document.getElementById("edit-price").value);
-  const newCur    = document.getElementById("edit-currency")?.value || "NOK";
-  const newPrice  = rawPrice ? (newCur === "NOK" ? Math.round(rawPrice) : toNok(rawPrice, newCur)) : null;
+  item.name   = name || item.name;
+  item.url    = url;
+  item.month  = month;
+  item.notes  = notes;
+  item.status = status;
+  if (imgVal && imgVal.startsWith("http")) item.image = imgVal;
+  else if (!imgVal) item.image = null;
   if (newPrice && newPrice !== item.price_current) {
     item.price_current = newPrice;
     item.currency = "NOK";
     const today = new Date().toISOString().slice(0, 10);
     item.price_history = [...(item.price_history || []), { date: today, price: newPrice }];
   }
-  item.categories = CATEGORIES.filter(c => document.getElementById("cb-" + c)?.checked);
+  item.categories = cats;
   if (item.status === "kjøpt" && !item.purchased_at) item.purchased_at = new Date().toISOString();
   closeModal();
   render();
   await save();
   toast("Lagret");
+}
+
+async function deleteFromEdit() {
+  if (editId == null) return;
+  const id = editId;
+  closeModal();
+  await deleteItem(id);
+}
+
+// ── Legg til sparing (bunnark) ─────────────────────────────────────────────────
+let sparId = null;
+
+function openSpar(id) {
+  const item = data.items.find(i => i.id === id);
+  if (!item) return;
+  sparId = id;
+  document.getElementById("spar-title").textContent = item.name || item.url;
+  const saved = item.saved || 0;
+  const price = item.price_current || 0;
+  const remaining = Math.max(0, price - saved);
+  document.getElementById("spar-sub").textContent = `${fmt(saved)} av ${fmt(price)} · mangler ${fmt(remaining)}`;
+  document.getElementById("spar-input").value = "";
+  document.getElementById("spar-confirm").textContent = "Legg til";
+  document.getElementById("spar-overlay").classList.add("open");
+}
+function closeSpar() {
+  document.getElementById("spar-overlay").classList.remove("open");
+  sparId = null;
+}
+function sparQuick(amount) {
+  document.getElementById("spar-input").value = amount;
+  updateSparConfirmLabel();
+}
+function updateSparConfirmLabel() {
+  const v = parseFloat(document.getElementById("spar-input").value) || 0;
+  document.getElementById("spar-confirm").textContent = v > 0 ? `Legg til ${fmt(v)}` : "Legg til";
+}
+async function sparConfirm() {
+  const item = data.items.find(i => i.id === sparId);
+  if (!item) return;
+  const amount = parseFloat(document.getElementById("spar-input").value) || 0;
+  if (amount <= 0) { closeSpar(); return; }
+  const price = item.price_current || 0;
+  item.saved = Math.min(price, (item.saved || 0) + amount);
+  closeSpar();
+  render();
+  await save();
+  toast("Lagt til sparing");
 }
 
 // ── Share / URL param ─────────────────────────────────────────────────────────
@@ -792,23 +670,24 @@ function startAutoRefresh() {
     render();
   }, 2 * 60 * 1000);
 }
-
-// ── Paste-knapp ───────────────────────────────────────────────────────────────
-async function pasteFromClipboard() {
-  try {
-    const text = await navigator.clipboard.readText();
-    if (!text || !text.startsWith("http")) { toast("Ingen lenke i utklippstavlen", true); return; }
-    document.getElementById("add-input").value = text;
-    toast("Lenke limt inn — trykk Legg til");
-  } catch {
-    toast("Kunne ikke lese utklippstavlen", true);
-  }
+async function refreshData() {
+  await load();
+  render();
+  toast("Oppdatert");
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function boot() {
-  const saved = localStorage.getItem("hl-theme") || "dark";
-  document.documentElement.setAttribute("data-theme", saved);
+  const savedTheme = localStorage.getItem("hl-theme");
+  const migrated = savedTheme === "light" ? "warm" : savedTheme;
+  const theme = THEME_CYCLE.includes(migrated) ? migrated : "warm";
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("hl-theme", theme);
+
+  document.getElementById("currency-pill").textContent = (displayCurrency === "NOK" ? "kr" : displayCurrency) + " ▾";
+
+  document.getElementById("add-input").addEventListener("keydown", e => { if (e.key === "Enter") handleAdd(); });
+  document.getElementById("spar-input").addEventListener("input", updateSparConfirmLabel);
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
