@@ -8,6 +8,7 @@ const CAT_ICONS = { "Skole": "🎓", "Klær": "👕", "Fritid": "🎮", "Gym": "
 const EDITABLE_STATUSES = ["ser_på","ønske","sparer_til","bestilt","kjøpt"];
 const STATUS_LABELS = { pending:"Henter...", ser_på:"Ser på", ønske:"Ønske", sparer_til:"Sparer til", bestilt:"Bestilt", kjøpt:"Kjøpt" };
 const STATUS_PILL_CLASS = { ser_på:"sp-onske", ønske:"sp-onske", sparer_til:"sp-sparer", bestilt:"sp-bestilt", kjøpt:"sp-kjopt" };
+const STATUS_ICONS = { ser_på:"👁", ønske:"♡", sparer_til:"💰", bestilt:"📦", kjøpt:"✓" };
 const CARD_HEIGHTS = [188, 152, 214, 164];
 const TINTS = [
   ["#e8ddd0","#ddcfbd"], ["#dbe3d6","#c9d6c0"], ["#dce2ea","#c7d2df"],
@@ -207,7 +208,7 @@ function renderCard(item, index, archived = false) {
 
   const dropHtml = priceDrop(item) ? `<div class="price-drop-badge">↓</div>` : "";
 
-  return `<div class="card${archived ? " card-archived" : ""}" onclick="openEdit('${item.id}')">
+  return `<div class="card${archived ? " card-archived" : ""}" onclick="openDetail('${item.id}')">
     <div class="card-img-wrap" style="height:${h}px">${imgHtml}</div>
     <div class="status-pill ${pillCls}">${STATUS_LABELS[item.status]}</div>
     ${dropHtml}
@@ -218,6 +219,97 @@ function renderCard(item, index, archived = false) {
       ${priceHtml}
     </div>
   </div>`;
+}
+
+// ── Produktdetalj (bunnark) ─────────────────────────────────────────────────
+let detailId = null;
+
+function openDetail(id) {
+  const item = data.items.find(i => i.id === id);
+  if (!item || item.status === "pending") return;
+  detailId = id;
+
+  const [tintA, tintB] = tintFor(item.id);
+  const imgWrap = document.getElementById("detail-img-wrap");
+  imgWrap.innerHTML = item.image
+    ? `<img src="${item.image}" alt="" onerror="cardImgError(this,'${tintA}','${tintB}')">`
+    : `<div class="placeholder" style="--tintA:${tintA};--tintB:${tintB}"></div>`;
+  imgWrap.onclick = () => { if (item.url) window.open(item.url, "_blank", "noopener"); };
+
+  document.getElementById("detail-name").textContent = item.name || item.url;
+
+  const priceEl = document.getElementById("detail-price");
+  if (item.price_current) {
+    const h = item.price_history;
+    let changeHtml = "";
+    if (h && h.length >= 2) {
+      const diff = h[h.length - 1].price - h[h.length - 2].price;
+      if (diff !== 0) {
+        const pct = Math.abs(Math.round((diff / h[h.length - 2].price) * 100));
+        changeHtml = `<span class="detail-price-change ${diff < 0 ? "down" : "up"}">${diff < 0 ? "↓" : "↑"} ${pct}%</span>`;
+      }
+    }
+    priceEl.innerHTML = `<span class="detail-price-amount">${fmt(item.price_current)}</span>${changeHtml}`;
+  } else {
+    priceEl.innerHTML = `<span class="detail-no-price">Ingen pris</span>`;
+  }
+
+  const catsEl = document.getElementById("detail-cats");
+  const cats = item.categories || [];
+  catsEl.innerHTML = cats.map(c => `<span class="detail-cat">${CAT_ICONS[c] ? CAT_ICONS[c] + " " : ""}${c}</span>`).join("");
+  catsEl.style.display = cats.length ? "flex" : "none";
+
+  const notesEl = document.getElementById("detail-notes");
+  notesEl.textContent = item.notes || "";
+  notesEl.style.display = item.notes ? "block" : "none";
+
+  const statusRow = document.getElementById("detail-status-row");
+  statusRow.innerHTML = EDITABLE_STATUSES.map(s => {
+    const isActive = item.status === s;
+    return `<button type="button" class="detail-status-btn${isActive ? " active" : ""}"
+      onclick="setItemStatus('${item.id}','${s}')">${STATUS_ICONS[s]} ${STATUS_LABELS[s]}</button>`;
+  }).join("");
+
+  const urlBtn = document.getElementById("detail-url-btn");
+  if (item.url) { urlBtn.href = item.url; urlBtn.style.display = "block"; }
+  else urlBtn.style.display = "none";
+
+  document.getElementById("detail-overlay").classList.add("open");
+}
+
+function closeDetail() {
+  document.getElementById("detail-overlay").classList.remove("open");
+  detailId = null;
+}
+
+async function setItemStatus(id, newStatus) {
+  const item = data.items.find(i => i.id === id);
+  if (!item) return;
+  item.status = newStatus;
+  if (newStatus === "kjøpt" && !item.purchased_at) item.purchased_at = new Date().toISOString();
+
+  if (detailId === id) {
+    document.querySelectorAll("#detail-status-row .detail-status-btn").forEach((btn, idx) => {
+      btn.classList.toggle("active", EDITABLE_STATUSES[idx] === newStatus);
+    });
+  }
+
+  render();
+  await save();
+  toast(STATUS_LABELS[newStatus]);
+}
+
+function openEditFromDetail() {
+  const id = detailId;
+  closeDetail();
+  setTimeout(() => openEdit(id), 60);
+}
+
+async function deleteFromDetail() {
+  if (!detailId) return;
+  const id = detailId;
+  closeDetail();
+  await deleteItem(id);
 }
 
 // ── Views ────────────────────────────────────────────────────────────────────

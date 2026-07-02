@@ -387,6 +387,46 @@ body {
   border-radius: 14px; padding: 13px 18px; font-size: .9rem; font-weight: 600; cursor: pointer;
 }
 
+/* ── DETAIL SHEET ── */
+.detail-modal { padding-left: 0; padding-right: 0; }
+.detail-modal .sheet-handle { margin-bottom: 12px; }
+.detail-img-wrap {
+  position: relative; margin: 0 16px 14px; border-radius: 18px; overflow: hidden;
+  background: var(--saveTrack); height: 220px; cursor: pointer;
+}
+.detail-img-wrap img { width: 100%; height: 100%; object-fit: contain; padding: 12px; }
+.detail-img-wrap .placeholder {
+  width: 100%; height: 100%;
+  background-image: repeating-linear-gradient(135deg, var(--tintA, var(--line)) 0 10px, var(--tintB, var(--saveTrack)) 10px 20px);
+}
+.detail-body { padding: 0 24px; }
+.detail-name { font-family: "Newsreader", serif; font-size: 1.25rem; font-weight: 500; color: var(--ink); line-height: 1.3; margin-bottom: 6px; }
+.detail-price { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.detail-price-amount { font-size: 1.25rem; font-weight: 700; color: var(--ink); }
+.detail-price-change { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.detail-price-change.down { background: color-mix(in srgb, var(--save) 22%, transparent); color: var(--saveInk); }
+.detail-price-change.up   { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+.detail-no-price { font-size: .85rem; color: var(--faint); }
+.detail-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.detail-cat { font-size: .72rem; font-weight: 600; color: var(--chipInk); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
+.detail-notes { font-size: .84rem; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+.detail-section-label { font-size: .72rem; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.detail-status-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.detail-status-btn {
+  flex: 1 0 auto; display: flex; align-items: center; gap: 5px;
+  font-size: .78rem; font-weight: 600; color: var(--chipInk);
+  background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+  padding: 8px 14px; cursor: pointer; transition: all .15s;
+}
+.detail-status-btn:active { transform: scale(.96); }
+.detail-status-btn.active { background: var(--accent); border-color: var(--accent); color: var(--onAccent); }
+.detail-footer { display: flex; flex-direction: column; gap: 10px; }
+.detail-url-btn {
+  display: block; text-align: center; background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 12px; font-size: .86rem; font-weight: 600; color: var(--accent); text-decoration: none;
+}
+.detail-actions { display: flex; gap: 8px; }
+
 /* ── SAVINGS SHEET ── */
 .spar-eyebrow { font-family: "DM Mono", monospace; font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--saveInk); margin-bottom: 6px; }
 .spar-sub { font-size: .82rem; color: var(--muted); margin-bottom: 18px; }
