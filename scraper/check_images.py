@@ -22,8 +22,9 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 MIN_SIDE = 200
 MAX_PORTRAIT = 2.2   # h/b over dette = for høyt for kortet
 MAX_LANDSCAPE = 2.5  # b/h over dette = tynn stripe
+MAX_CLOTHING_LANDSCAPE = 1.2  # klesplagg skal være portrett — liggende = feil CDN-crop
 
-def check(url):
+def check(url, is_clothing=False):
     """Returnerer (ok, melding)."""
     try:
         r = requests.get(url, headers={"User-Agent": UA}, timeout=20, stream=True)
@@ -45,6 +46,8 @@ def check(url):
         return False, f"for høyt format ({w}x{h}, ratio {h/w:.1f})"
     if w / h > MAX_LANDSCAPE:
         return False, f"for bredt format ({w}x{h}, ratio {w/h:.1f})"
+    if is_clothing and w / h > MAX_CLOTHING_LANDSCAPE:
+        return False, f"liggende format på klesplagg ({w}x{h}) — sannsynlig feil CDN-crop, sjekk om ?w=/&h=-params kan fjernes"
     return True, f"{w}x{h} OK"
 
 def main():
@@ -58,7 +61,8 @@ def main():
         if not url:
             missing.append(name)
             continue
-        ok, msg = check(url)
+        is_clothing = "Klær" in (it.get("categories") or [])
+        ok, msg = check(url, is_clothing)
         if not ok:
             problems.append((name, msg, url))
             print(f"  FEIL  {name} — {msg}")
