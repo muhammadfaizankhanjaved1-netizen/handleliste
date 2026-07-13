@@ -209,7 +209,7 @@ function renderCard(item, index, archived = false) {
   const dropHtml = priceDrop(item) ? `<div class="price-drop-badge">↓</div>` : "";
 
   return `<div class="card${archived ? " card-archived" : ""}" onclick="openDetail('${item.id}')">
-    <div class="card-img-wrap" style="height:${h}px">${imgHtml}</div>
+    <div class="card-img-wrap${item.image ? " has-img" : ""}"${item.image ? "" : ` style="height:${h}px"`}>${imgHtml}</div>
     <div class="status-pill ${pillCls}">${STATUS_LABELS[item.status]}</div>
     ${dropHtml}
     <div class="card-body">
