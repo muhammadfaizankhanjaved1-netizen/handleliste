@@ -209,7 +209,7 @@ function renderCard(item, index, archived = false) {
   const dropHtml = priceDrop(item) ? `<div class="price-drop-badge">↓</div>` : "";
 
   return `<div class="card${archived ? " card-archived" : ""}" onclick="openDetail('${item.id}')">
-    <div class="card-img-wrap${item.image ? " has-img" : ""}"${item.image ? "" : ` style="height:${h}px"`}>${imgHtml}</div>
+    <div class="card-img-wrap${item.image ? " has-img" : ""}"${item.image ? "" : ` style="height:${h}px"`} onclick="event.stopPropagation();openCardLink('${item.id}')">${imgHtml}</div>
     <div class="status-pill ${pillCls}">${STATUS_LABELS[item.status]}</div>
     ${dropHtml}
     <div class="card-body">
@@ -219,6 +219,12 @@ function renderCard(item, index, archived = false) {
       ${priceHtml}
     </div>
   </div>`;
+}
+
+function openCardLink(id) {
+  const item = data.items.find(i => i.id === id);
+  if (item && item.url) window.open(item.url, "_blank", "noopener");
+  else openDetail(id);
 }
 
 // ── Produktdetalj (bunnark) ─────────────────────────────────────────────────
