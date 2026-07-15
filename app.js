@@ -179,13 +179,31 @@ function cardImgError(img, tintA, tintB) {
   img.replaceWith(div);
 }
 
+// Reserverer eksakt korthøyde før lazy-bildet lastes, så masonryen ikke
+// re-balanseres under scrolling (layout-shift-fiksen 2026-07-15).
+const IMG_DIMS_KEY = "hl_img_dims";
+let imgDims = {};
+try { imgDims = JSON.parse(localStorage.getItem(IMG_DIMS_KEY) || "{}") || {}; } catch (e) { imgDims = {}; }
+function cacheImgDims(img) {
+  if (!img.naturalWidth || !img.naturalHeight) return;
+  const key = img.getAttribute("src");
+  const cur = imgDims[key];
+  if (!cur || cur[0] !== img.naturalWidth || cur[1] !== img.naturalHeight) {
+    imgDims[key] = [img.naturalWidth, img.naturalHeight];
+    try { localStorage.setItem(IMG_DIMS_KEY, JSON.stringify(imgDims)); } catch (e) {}
+  }
+  img.style.aspectRatio = img.naturalWidth + " / " + img.naturalHeight;
+}
+
 // ── VareKort ─────────────────────────────────────────────────────────────────
 function renderCard(item, index, archived = false) {
   const h = CARD_HEIGHTS[index % CARD_HEIGHTS.length];
   const [tintA, tintB] = tintFor(item.id);
   let imgHtml;
   if (item.image) {
-    imgHtml = `<img src="${item.image}" alt="" loading="lazy" onerror="cardImgError(this,'${tintA}','${tintB}')">`;
+    const dims = imgDims[item.image];
+    const ratioStyle = dims ? ` style="aspect-ratio:${dims[0]} / ${dims[1]}"` : "";
+    imgHtml = `<img src="${item.image}" alt="" loading="lazy"${ratioStyle} onload="cacheImgDims(this)" onerror="cardImgError(this,'${tintA}','${tintB}')">`;
   } else {
     imgHtml = `<div class="placeholder" style="--tintA:${tintA};--tintB:${tintB}"><span>bilde</span></div>`;
   }
