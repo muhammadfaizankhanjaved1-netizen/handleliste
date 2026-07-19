@@ -263,7 +263,7 @@ function renderCard(item, index, archived = false) {
 
   const dropHtml = priceDrop(item) ? `<div class="price-drop-badge">↓</div>` : "";
 
-  return `<div class="card${archived ? " card-archived" : ""}" style="--i:${index}" onclick="openDetail('${item.id}')">
+  return `<div class="card${archived ? " card-archived" : ""}" style="--i:${Math.min(index, 9)}" onclick="openDetail('${item.id}')">
     <div class="card-img-wrap${item.image ? " has-img" : ""}"${item.image ? "" : ` style="height:${h}px"`} onclick="event.stopPropagation();openCardLink('${item.id}')">${imgHtml}</div>
     <div class="status-pill ${pillCls}">${STATUS_LABELS[item.status]}</div>
     ${dropHtml}
