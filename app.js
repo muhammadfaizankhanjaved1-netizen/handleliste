@@ -576,18 +576,11 @@ function renderBubbles() {
   const sub = document.createElement("div");
   sub.className = "bubble-sub";
   sub.textContent = "Trykk en boble for å filtrere";
-  const closeBtn = document.createElement("button");
-  closeBtn.type = "button";
-  closeBtn.className = "bubble-close";
-  closeBtn.textContent = "✕";
-  closeBtn.setAttribute("aria-label", "Lukk oversikt");
-  closeBtn.onclick = closeBubbles;
-  topbar.append(title, sub, closeBtn);
+  topbar.append(title, sub);
   bv.appendChild(topbar);
 
   const cloud = document.createElement("div");
   cloud.className = "bubble-cloud";
-  cloud.addEventListener("click", e => { if (e.target === cloud) closeBubbles(); });
 
   if (!entries.length) {
     cloud.innerHTML = `<div class="empty"><div class="empty-icon">🫧</div><p>Ingenting å gruppere ennå.</p></div>`;
@@ -597,7 +590,7 @@ function renderBubbles() {
     entries.forEach(([cat, list], idx) => {
       const count = list.length;
       const t = max === min ? 1 : (count - min) / (max - min);
-      const size = Math.round(78 + t * (168 - 78));
+      const size = Math.round(70 + t * (148 - 70));
       const total = list.reduce((s, i) => s + (i.price_current || 0), 0);
       const isNone = cat === "__none__";
       const icon = isNone ? "🗂️" : (CAT_ICONS[cat] || "🏷️");
@@ -633,11 +626,30 @@ function renderBubbles() {
   bv.appendChild(cloud);
 }
 
+// Fryser bakgrunnslisten mens boblene er åpne, så man ikke kan skrolle den ved
+// et uhell — og går man ut uten å velge en boble, er man akkurat der man var.
+let savedScrollY = 0;
+function lockBodyScroll() {
+  savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.body.style.position = "fixed";
+  document.body.style.top = (-savedScrollY) + "px";
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+}
+function unlockBodyScroll(restore) {
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  if (restore) window.scrollTo(0, savedScrollY);
+}
+
 function openBubbles() {
   if (bubblesOpen || document.querySelector(".modal-overlay.open")) return;
   bubblesOpen = true;
   renderBubbles();
   document.getElementById("bubble-view").classList.add("open");
+  lockBodyScroll();
   if (navigator.vibrate) navigator.vibrate(8);
 }
 
@@ -645,6 +657,15 @@ function closeBubbles() {
   if (!bubblesOpen) return;
   bubblesOpen = false;
   document.getElementById("bubble-view").classList.remove("open");
+  unlockBodyScroll(true);
+}
+
+// Trykk hvor som helst utenom selve boblene (topptekst, bakgrunn) → lukk.
+// Festet én gang ved boot, ikke inne i renderBubbles (som kjører på nytt hver åpning).
+function setupBubbleOutsideTap() {
+  document.getElementById("bubble-view").addEventListener("click", e => {
+    if (bubblesOpen && !e.target.closest(".bubble")) closeBubbles();
+  });
 }
 
 function selectBubble(cat, btnEl) {
@@ -653,9 +674,12 @@ function selectBubble(cat, btnEl) {
   const bv = document.getElementById("bubble-view");
   if (btnEl) btnEl.classList.add("selected");
   bubblesOpen = false;
-  // Samme myke fade/scale-ut som ✕-knappen bruker — ingen brå overgang
+  // Samme myke fade/scale-ut som brukes ved lukking — ingen brå overgang
   bv.classList.remove("open");
   setTimeout(() => {
+    // Ikke gjenopprett gammel skrollposisjon — den filtrerte lista skal starte øverst.
+    // Ventet til nå (ikke ved klikk) så bakgrunnslista forblir låst gjennom hele fade-ut.
+    unlockBodyScroll(false);
     render();
     const gallery = document.querySelector(".gallery");
     if (gallery) {
@@ -1004,6 +1028,7 @@ async function boot() {
   document.getElementById("spar-input").addEventListener("input", updateSparConfirmLabel);
   document.addEventListener("keydown", e => { if (e.key === "Escape" && bubblesOpen) closeBubbles(); });
   setupPinchGestures();
+  setupBubbleOutsideTap();
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});

@@ -468,30 +468,21 @@ body {
   transition: opacity .32s ease, transform .32s cubic-bezier(.22,1,.36,1);
 }
 .bubble-topbar {
-  display: flex; align-items: center; justify-content: center; position: relative;
-  flex-shrink: 0; padding: max(16px, env(safe-area-inset-top)) 56px 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  flex-shrink: 0; padding: max(14px, env(safe-area-inset-top)) 24px 12px;
   border-bottom: 1px solid var(--line);
 }
 .bubble-title {
-  font-family: "Newsreader", serif; font-size: 1.15rem; font-weight: 500; color: var(--ink);
+  font-family: "Newsreader", serif; font-size: 1.1rem; font-weight: 500; color: var(--ink);
 }
 .bubble-sub {
-  position: absolute; left: 0; right: 0; bottom: -18px; text-align: center;
-  font-family: "DM Mono", monospace; font-size: .64rem; letter-spacing: .04em;
-  color: var(--faint); padding-bottom: 4px;
+  font-family: "DM Mono", monospace; font-size: .64rem; letter-spacing: .03em;
+  color: var(--faint); text-align: center;
 }
-.bubble-close {
-  position: absolute; right: 16px; top: max(12px, env(safe-area-inset-top));
-  width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--line);
-  background: var(--card); color: var(--ink); font-size: .9rem; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  transition: transform .15s, background .15s;
-}
-.bubble-close:active { transform: scale(.9); }
 
 .bubble-cloud {
   flex: 1; display: flex; flex-wrap: wrap; align-content: center; justify-content: center;
-  align-items: center; gap: 14px; padding: 30px 24px 40px; overflow-y: auto;
+  align-items: center; gap: 12px; padding: 20px 24px; overflow: hidden;
 }
 .bubble {
   --size: 100px;
