@@ -38,8 +38,20 @@ function loadCache() {
   try { const s = localStorage.getItem(CACHE_KEY); return s ? JSON.parse(s) : null; } catch { return null; }
 }
 
+const PENDING_KEY = "hl-pending-sync";
+function markPending(v) { try { localStorage.setItem(PENDING_KEY, v ? "1" : ""); } catch {} }
+function hasPending()   { try { return localStorage.getItem(PENDING_KEY) === "1"; } catch { return false; } }
+
 async function load() {
   try {
+    // Endringer gjort offline? Push dem FØR fersk henting — ellers
+    // ville sky-data overskrevet det som ble endret uten nett.
+    if (hasPending()) {
+      const cached = loadCache();
+      if (cached) data = cached;
+      const ok = await save();
+      if (!ok) throw new Error("offline-pending");
+    }
     const r = await fetch(`${BIN_URL}/latest`, { headers: { "X-Master-Key": BIN_KEY } });
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
@@ -63,13 +75,38 @@ async function load() {
   }
 }
 async function save() {
-  await fetch(BIN_URL, {
-    method: "PUT",
-    headers: { "X-Master-Key": BIN_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  // Lokal kopi FØRST — feiler nettet ligger endringen trygt og synkes senere
   saveCache(data);
+  try {
+    const r = await fetch(BIN_URL, {
+      method: "PUT",
+      headers: { "X-Master-Key": BIN_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!r.ok) throw new Error(r.status);
+    markPending(false);
+    return true;
+  } catch (e) {
+    markPending(true);
+    const offlineBanner = document.getElementById("offline-banner");
+    if (offlineBanner) offlineBanner.style.display = "block";
+    toast("📴 Lagret lokalt — synkes når du får nett");
+    return false;
+  }
 }
+
+// Auto-synk når nettet kommer tilbake
+window.addEventListener("online", () => {
+  if (hasPending()) {
+    save().then(ok => {
+      if (ok) {
+        toast("✓ Synkronisert etter frakobling");
+        const b = document.getElementById("offline-banner");
+        if (b) b.style.display = "none";
+      }
+    });
+  }
+});
 
 // ── UUID ─────────────────────────────────────────────────────────────────────
 function uuid() {
