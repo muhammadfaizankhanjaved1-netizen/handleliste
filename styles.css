@@ -468,15 +468,15 @@ body {
   transition: opacity .2s ease, transform .2s cubic-bezier(.22,1,.36,1);
 }
 .bubble-topbar {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  flex-shrink: 0; padding: max(14px, env(safe-area-inset-top)) 24px 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  flex-shrink: 0; padding: calc(env(safe-area-inset-top) + 22px) 24px 18px;
   border-bottom: 1px solid var(--line);
 }
 .bubble-title {
-  font-family: "Newsreader", serif; font-size: 1.1rem; font-weight: 500; color: var(--ink);
+  font-family: "Newsreader", serif; font-size: 1.35rem; font-weight: 500; color: var(--ink);
 }
 .bubble-sub {
-  font-family: "DM Mono", monospace; font-size: .64rem; letter-spacing: .03em;
+  font-family: "DM Mono", monospace; font-size: .76rem; letter-spacing: .02em;
   color: var(--faint); text-align: center;
 }
 
