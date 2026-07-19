@@ -26,6 +26,7 @@
     <div class="header-actions">
       <button class="currency-pill" id="currency-pill" onclick="cycleCurrency()">kr ▾</button>
       <button class="theme-pill" id="theme-pill" onclick="cycleTheme()" title="Bytt tema">🎨</button>
+      <button class="theme-pill" id="bubble-pill" onclick="openBubbles()" title="Grupper etter kategori">🫧</button>
       <button class="btn-icon" onclick="openAdd()" title="Ny vare">+</button>
     </div>
   </div>
@@ -60,6 +61,9 @@
 
 <!-- ── Main content ── -->
 <div id="main"></div>
+
+<!-- ── Boble-oversikt (klyp for å zoome ut) ── -->
+<div class="bubble-view" id="bubble-view"></div>
 
 <!-- ── Product detail sheet ── -->
 <div class="modal-overlay" id="detail-overlay" onclick="if(event.target===this)closeDetail()">

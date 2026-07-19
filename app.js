@@ -263,7 +263,7 @@ function renderCard(item, index, archived = false) {
 
   const dropHtml = priceDrop(item) ? `<div class="price-drop-badge">↓</div>` : "";
 
-  return `<div class="card${archived ? " card-archived" : ""}" onclick="openDetail('${item.id}')">
+  return `<div class="card${archived ? " card-archived" : ""}" style="--i:${index}" onclick="openDetail('${item.id}')">
     <div class="card-img-wrap${item.image ? " has-img" : ""}"${item.image ? "" : ` style="height:${h}px"`} onclick="event.stopPropagation();openCardLink('${item.id}')">${imgHtml}</div>
     <div class="status-pill ${pillCls}">${STATUS_LABELS[item.status]}</div>
     ${dropHtml}
@@ -380,7 +380,8 @@ function activeItems() {
 function filteredItems() {
   const q = searchQuery.trim().toLowerCase();
   const items = activeItems().filter(i => {
-    if (filters.cat && !(i.categories || []).includes(filters.cat)) return false;
+    if (filters.cat === "__none__" && (i.categories || []).length) return false;
+    if (filters.cat && filters.cat !== "__none__" && !(i.categories || []).includes(filters.cat)) return false;
     if (filters.status && i.status !== filters.status) return false;
     if (q && !((i.name || "") + (i.url || "") + (i.notes || "")).toLowerCase().includes(q)) return false;
     return true;
@@ -548,6 +549,166 @@ function render() {
   document.getElementById(`nav-${view}`).classList.add("active");
 }
 function setView(v) { view = v; render(); }
+
+// ── Boble-oversikt (klyp for å zoome ut → gruppert etter kategori) ─────────────
+let bubblesOpen = false;
+
+function groupByCategory() {
+  const groups = {};
+  activeItems().forEach(i => {
+    const cats = (i.categories && i.categories.length) ? i.categories : ["__none__"];
+    cats.forEach(c => { (groups[c] = groups[c] || []).push(i); });
+  });
+  return groups;
+}
+
+function renderBubbles() {
+  const bv = document.getElementById("bubble-view");
+  const entries = Object.entries(groupByCategory()).sort((a, b) => b[1].length - a[1].length);
+
+  bv.innerHTML = "";
+
+  const topbar = document.createElement("div");
+  topbar.className = "bubble-topbar";
+  const title = document.createElement("div");
+  title.className = "bubble-title";
+  title.textContent = "Kategorier";
+  const sub = document.createElement("div");
+  sub.className = "bubble-sub";
+  sub.textContent = "Trykk en boble for å filtrere";
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "bubble-close";
+  closeBtn.textContent = "✕";
+  closeBtn.setAttribute("aria-label", "Lukk oversikt");
+  closeBtn.onclick = closeBubbles;
+  topbar.append(title, sub, closeBtn);
+  bv.appendChild(topbar);
+
+  const cloud = document.createElement("div");
+  cloud.className = "bubble-cloud";
+  cloud.addEventListener("click", e => { if (e.target === cloud) closeBubbles(); });
+
+  if (!entries.length) {
+    cloud.innerHTML = `<div class="empty"><div class="empty-icon">🫧</div><p>Ingenting å gruppere ennå.</p></div>`;
+  } else {
+    const counts = entries.map(([, list]) => list.length);
+    const max = Math.max(...counts), min = Math.min(...counts);
+    entries.forEach(([cat, list], idx) => {
+      const count = list.length;
+      const t = max === min ? 1 : (count - min) / (max - min);
+      const size = Math.round(78 + t * (168 - 78));
+      const total = list.reduce((s, i) => s + (i.price_current || 0), 0);
+      const isNone = cat === "__none__";
+      const icon = isNone ? "🗂️" : (CAT_ICONS[cat] || "🏷️");
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "bubble";
+      btn.style.setProperty("--size", size + "px");
+      const popDelay = idx * 40;
+      btn.style.animationDelay = `${popDelay}ms, ${420 + popDelay}ms`;
+
+      const iconEl = document.createElement("span");
+      iconEl.className = "bubble-icon";
+      iconEl.textContent = icon;
+      const nameEl = document.createElement("span");
+      nameEl.className = "bubble-name";
+      nameEl.textContent = isNone ? "Uten kategori" : cat;
+      const countEl = document.createElement("span");
+      countEl.className = "bubble-count";
+      countEl.textContent = count + (count === 1 ? " vare" : " varer");
+      btn.append(iconEl, nameEl, countEl);
+      // Prisraden trenges kun når boblen er stor nok til å vise den pent
+      if (total > 0 && size >= 112) {
+        const totalEl = document.createElement("span");
+        totalEl.className = "bubble-total";
+        totalEl.textContent = fmt(total);
+        btn.appendChild(totalEl);
+      }
+      btn.addEventListener("click", () => selectBubble(cat, btn));
+      cloud.appendChild(btn);
+    });
+  }
+  bv.appendChild(cloud);
+}
+
+function openBubbles() {
+  if (bubblesOpen || document.querySelector(".modal-overlay.open")) return;
+  bubblesOpen = true;
+  renderBubbles();
+  document.getElementById("bubble-view").classList.add("open");
+  if (navigator.vibrate) navigator.vibrate(8);
+}
+
+function closeBubbles() {
+  if (!bubblesOpen) return;
+  bubblesOpen = false;
+  document.getElementById("bubble-view").classList.remove("open");
+}
+
+function selectBubble(cat, btnEl) {
+  filters.cat = cat;
+  view = "wishlist";
+  const bv = document.getElementById("bubble-view");
+  if (btnEl) btnEl.classList.add("selected");
+  bubblesOpen = false;
+  // Samme myke fade/scale-ut som ✕-knappen bruker — ingen brå overgang
+  bv.classList.remove("open");
+  setTimeout(() => {
+    render();
+    const gallery = document.querySelector(".gallery");
+    if (gallery) {
+      gallery.classList.add("zoom-in-anim");
+      setTimeout(() => gallery.classList.remove("zoom-in-anim"), 500);
+    }
+  }, 260);
+}
+
+// Klyp med to fingre hvor som helst i appen for å zoome ut til boble-oversikten;
+// spre fingrene fra hverandre inne i oversikten for å zoome tilbake til vanlig visning.
+function touchDist(a, b) {
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+}
+function setupPinchGestures() {
+  const main = document.getElementById("main");
+  let inStart = null, inTriggered = false;
+  main.addEventListener("touchstart", e => {
+    if (e.touches.length === 2 && !bubblesOpen && !document.querySelector(".modal-overlay.open")) {
+      inStart = touchDist(e.touches[0], e.touches[1]);
+      inTriggered = false;
+    } else {
+      inStart = null;
+    }
+  }, { passive: true });
+  main.addEventListener("touchmove", e => {
+    if (inStart == null || e.touches.length !== 2) return;
+    e.preventDefault();
+    if (inTriggered) return;
+    if (touchDist(e.touches[0], e.touches[1]) / inStart < 0.72) {
+      inTriggered = true;
+      openBubbles();
+    }
+  }, { passive: false });
+  main.addEventListener("touchend", () => { inStart = null; inTriggered = false; });
+
+  const bv = document.getElementById("bubble-view");
+  let outStart = null, outTriggered = false;
+  bv.addEventListener("touchstart", e => {
+    if (e.touches.length === 2) { outStart = touchDist(e.touches[0], e.touches[1]); outTriggered = false; }
+    else outStart = null;
+  }, { passive: true });
+  bv.addEventListener("touchmove", e => {
+    if (outStart == null || e.touches.length !== 2) return;
+    e.preventDefault();
+    if (outTriggered) return;
+    if (touchDist(e.touches[0], e.touches[1]) / outStart > 1.35) {
+      outTriggered = true;
+      closeBubbles();
+    }
+  }, { passive: false });
+  bv.addEventListener("touchend", () => { outStart = null; outTriggered = false; });
+}
 
 // ── Legg til (lim inn lenke) ───────────────────────────────────────────────────
 async function addItem(url) {
@@ -841,6 +1002,8 @@ async function boot() {
 
   document.getElementById("add-input").addEventListener("keydown", e => { if (e.key === "Enter") handleAdd(); });
   document.getElementById("spar-input").addEventListener("input", updateSparConfirmLabel);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && bubblesOpen) closeBubbles(); });
+  setupPinchGestures();
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
