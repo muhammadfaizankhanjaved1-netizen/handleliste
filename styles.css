@@ -460,12 +460,12 @@ body {
   pointer-events: none; visibility: hidden;
   /* opacity med jevn ease (ikke den bratte decel-kurven under — den gjorde fade-ut
      nesten usynlig etter 100ms og føltes som et brått hopp i stedet for en fade) */
-  transition: opacity .32s ease, transform .32s cubic-bezier(.22,1,.36,1), visibility 0s linear .32s;
+  transition: opacity .2s ease, transform .2s cubic-bezier(.22,1,.36,1), visibility 0s linear .2s;
 }
 .bubble-view.open {
   opacity: 1; transform: scale(1);
   pointer-events: auto; visibility: visible;
-  transition: opacity .32s ease, transform .32s cubic-bezier(.22,1,.36,1);
+  transition: opacity .2s ease, transform .2s cubic-bezier(.22,1,.36,1);
 }
 .bubble-topbar {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
@@ -496,11 +496,6 @@ body {
   animation: bubblePop .42s cubic-bezier(.34,1.56,.64,1) forwards, bubbleFloat 4.2s ease-in-out .42s infinite;
   transition: transform .22s ease, opacity .22s ease;
 }
-.bubble.selected {
-  transform: scale(1.08) !important; animation: none;
-  border-color: var(--accent); box-shadow: 0 0 0 5px var(--accentSoft), 0 10px 26px -14px rgba(20,16,8,0.5);
-  transition: transform .18s ease, box-shadow .18s ease;
-}
 @keyframes bubblePop { from { transform: scale(.35); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes bubbleFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
 .bubble:active { transform: scale(.95); }
@@ -515,15 +510,8 @@ body {
 }
 .bubble-total { font-family: "DM Mono", monospace; font-size: .58rem; color: var(--faint); }
 
-/* Myk pop-inn på galleriet når man trykker en boble og zoomer inn igjen */
-.gallery.zoom-in-anim .card {
-  animation: cardPopIn .42s cubic-bezier(.34,1.56,.64,1) both;
-  animation-delay: calc(var(--i, 0) * 26ms);
-}
-@keyframes cardPopIn { from { transform: scale(.88) translateY(8px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
-
 @media (prefers-reduced-motion: reduce) {
-  .bubble-view, .bubble, .gallery.zoom-in-anim .card { animation: none !important; transition-duration: .01ms !important; }
+  .bubble-view, .bubble { animation: none !important; transition-duration: .01ms !important; }
 }
 
 /* ── EMPTY ── */

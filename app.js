@@ -263,7 +263,7 @@ function renderCard(item, index, archived = false) {
 
   const dropHtml = priceDrop(item) ? `<div class="price-drop-badge">↓</div>` : "";
 
-  return `<div class="card${archived ? " card-archived" : ""}" style="--i:${Math.min(index, 9)}" onclick="openDetail('${item.id}')">
+  return `<div class="card${archived ? " card-archived" : ""}" onclick="openDetail('${item.id}')">
     <div class="card-img-wrap${item.image ? " has-img" : ""}"${item.image ? "" : ` style="height:${h}px"`} onclick="event.stopPropagation();openCardLink('${item.id}')">${imgHtml}</div>
     <div class="status-pill ${pillCls}">${STATUS_LABELS[item.status]}</div>
     ${dropHtml}
@@ -619,7 +619,7 @@ function renderBubbles() {
         totalEl.textContent = fmt(total);
         btn.appendChild(totalEl);
       }
-      btn.addEventListener("click", () => selectBubble(cat, btn));
+      btn.addEventListener("click", () => selectBubble(cat));
       cloud.appendChild(btn);
     });
   }
@@ -668,25 +668,17 @@ function setupBubbleOutsideTap() {
   });
 }
 
-function selectBubble(cat, btnEl) {
+function selectBubble(cat) {
   filters.cat = cat;
   view = "wishlist";
   const bv = document.getElementById("bubble-view");
-  if (btnEl) btnEl.classList.add("selected");
   bubblesOpen = false;
-  // Samme myke fade/scale-ut som brukes ved lukking — ingen brå overgang
+  // Rendrer med én gang MENS boble-visningen fortsatt dekker skjermen (den er
+  // ugjennomsiktig helt til fade-ut-transisjonen kjører) — ingen ventetid,
+  // ingen egen kort-animasjon nødvendig. Det eneste du ser er selve fade-ut'en.
+  unlockBodyScroll(false); // ikke gjenopprett gammel posisjon — ny liste starter øverst
+  render();
   bv.classList.remove("open");
-  setTimeout(() => {
-    // Ikke gjenopprett gammel skrollposisjon — den filtrerte lista skal starte øverst.
-    // Ventet til nå (ikke ved klikk) så bakgrunnslista forblir låst gjennom hele fade-ut.
-    unlockBodyScroll(false);
-    render();
-    const gallery = document.querySelector(".gallery");
-    if (gallery) {
-      gallery.classList.add("zoom-in-anim");
-      setTimeout(() => gallery.classList.remove("zoom-in-anim"), 500);
-    }
-  }, 260);
 }
 
 // Klyp med to fingre hvor som helst i appen for å zoome ut til boble-oversikten;
