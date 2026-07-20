@@ -544,9 +544,9 @@ body {
 .tier-items.drag-over { background: var(--accentSoft); outline: 2px dashed var(--accentBorder); outline-offset: -2px; }
 .tier-pool-items { min-height: 64px; }
 
-.tier-chip-wrap { display: flex; flex-direction: column; align-items: center; width: 56px; }
+.tier-chip-wrap { display: flex; flex-direction: column; align-items: center; width: 62px; }
 .tier-chip {
-  width: 50px; height: 50px; border-radius: 50%; overflow: hidden; position: relative; flex-shrink: 0;
+  width: 56px; height: 56px; border-radius: 50%; overflow: hidden; position: relative; flex-shrink: 0;
   background: #fff; border: 2px solid var(--card);
   box-shadow: 0 2px 6px -2px rgba(20,16,8,0.45); cursor: grab; touch-action: none;
   -webkit-tap-highlight-color: transparent; transition: transform .1s;
@@ -562,7 +562,7 @@ body {
   position: fixed; z-index: 500; pointer-events: none; box-shadow: 0 14px 30px -10px rgba(20,16,8,0.55);
   transform: scale(1.15); opacity: .96; cursor: grabbing;
 }
-.tier-chip-price { font-family: "DM Mono", monospace; font-size: .6rem; color: var(--faint); margin-top: 3px; text-align: center; }
+.tier-chip-price { font-family: "DM Mono", monospace; font-size: .64rem; color: var(--faint); margin-top: 4px; text-align: center; }
 .tier-badge {
   position: absolute; min-width: 17px; height: 17px; border-radius: 999px; padding: 0 3px;
   display: flex; align-items: center; justify-content: center; font-size: .58rem;
@@ -622,4 +622,9 @@ body {
 @media (min-width: 600px) {
   body { max-width: 480px; margin: 0 auto; }
   .bottom-nav { left: 50%; right: auto; transform: translateX(-50%); border-radius: 20px 20px 0 0; width: 480px; }
+  /* Samme 480px-kolonne på PC/iPad som på telefon, men litt større bobler —
+     mer plass rundt gjør at trangere bilder gagner mer av litt ekstra størrelse. */
+  .tier-chip-wrap { width: 68px; }
+  .tier-chip { width: 62px; height: 62px; }
+  .tier-chip-price { font-size: .68rem; }
 }

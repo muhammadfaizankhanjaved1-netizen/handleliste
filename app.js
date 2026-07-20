@@ -557,10 +557,13 @@ function catTally(items) {
   items.forEach(i => (i.categories || []).forEach(c => { counts[c] = (counts[c] || 0) + 1; }));
   return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4);
 }
+function catTallyInner(items) {
+  return catTally(items).map(([c, n]) => `<span class="cat-tally">${CAT_ICONS[c] || "🏷️"} ${n}</span>`).join("");
+}
+// Wrapperen rendres alltid (selv tom) slik at drop-patching under kan
+// oppdatere innholdet uten å måtte lage/fjerne selve div-en.
 function catTallyHtml(items) {
-  const t = catTally(items);
-  if (!t.length) return "";
-  return `<div class="tier-col-cats">${t.map(([c, n]) => `<span class="cat-tally">${CAT_ICONS[c] || "🏷️"} ${n}</span>`).join("")}</div>`;
+  return `<div class="tier-col-cats">${catTallyInner(items)}</div>`;
 }
 
 function tierChip(item) {
@@ -578,14 +581,15 @@ function tierChip(item) {
   </div>`;
 }
 
-function tierColHtml(tierKey, statusVal, items) {
+function tierColHeadHtml(statusVal, items) {
   const label = statusVal === "ønske" ? "Ønsker meg" : "Ser på";
   const sum = items.reduce((s, i) => s + (i.price_current || 0), 0);
+  return `<span>${label} <span class="tier-col-count">${items.length}</span></span>${sum ? `<span class="tier-col-sum">${fmt(sum)}</span>` : ""}`;
+}
+
+function tierColHtml(tierKey, statusVal, items) {
   return `<div class="tier-col">
-    <div class="tier-col-label">
-      <span>${label} <span class="tier-col-count">${items.length}</span></span>
-      ${sum ? `<span class="tier-col-sum">${fmt(sum)}</span>` : ""}
-    </div>
+    <div class="tier-col-label">${tierColHeadHtml(statusVal, items)}</div>
     ${catTallyHtml(items)}
     <div class="tier-items" data-tier="${tierKey}" data-status="${statusVal}">${items.map(tierChip).join("")}</div>
   </div>`;
@@ -660,7 +664,19 @@ function cardSortPlace(id, tierKey, statusVal) {
   if (!item) return;
   item.tier = tierKey;
   if (item.status !== "sparer_til") item.status = statusVal;
-  render();
+
+  const main = document.getElementById("main");
+  const target = main.querySelector(`.tier-items[data-tier="${tierKey}"][data-status="${statusVal}"]`);
+  moveTierChipDom(id, target);
+
+  // Kort-modus sin egen forhåndsvisning bytter uansett til en ny vare (nytt
+  // bilde er forventet der) — bare den, ikke resten av brettet, skal fornyes.
+  const csWrap = document.querySelector(".card-sorter");
+  if (csWrap) {
+    const fresh = renderCardSorter();
+    if (fresh) csWrap.outerHTML = fresh; else csWrap.remove();
+  }
+  updateTierBadge();
   save();
   if (navigator.vibrate) navigator.vibrate(6);
 }
@@ -670,6 +686,51 @@ function renderTier() {
   const pool = tierPoolItems();
   const showCards = pool.length > 0 && !cardSorterDismissed;
   document.getElementById("main").innerHTML = (showCards ? renderCardSorter() : "") + renderTierBoard();
+}
+
+// Oppdaterer kun tall/sum/kategori-tekst rundt en .tier-items-beholder, uten å
+// røre selve vare-boblene — det er derfor bilder IKKE laster på nytt ved hver
+// flytting. Kalles på BÅDE gammel og ny beholder etter en flytting.
+function patchTierHeads(itemsEl) {
+  if (!itemsEl) return;
+  const tierKey = itemsEl.dataset.tier || null;
+  const statusVal = itemsEl.dataset.status || null;
+  const row = itemsEl.closest(".tier-row");
+  if (!row) return;
+  if (tierKey) {
+    const col = itemsEl.closest(".tier-col");
+    const colItems = tierBoardItems().filter(i => i.tier === tierKey && tierColumnOf(i) === statusVal);
+    if (col) {
+      col.querySelector(".tier-col-label").innerHTML = tierColHeadHtml(statusVal, colItems);
+      const catsEl = col.querySelector(".tier-col-cats");
+      if (catsEl) catsEl.innerHTML = catTallyInner(colItems);
+    }
+    const rowItems = tierBoardItems().filter(i => i.tier === tierKey);
+    const rowSum = rowItems.reduce((s, i) => s + (i.price_current || 0), 0);
+    const rowSumEl = row.querySelector(".tier-row-sum");
+    if (rowSumEl) rowSumEl.textContent = rowSum ? fmt(rowSum) : "";
+  } else {
+    const poolItems = tierPoolItems();
+    const rowSumEl = row.querySelector(".tier-row-sum");
+    if (rowSumEl) rowSumEl.textContent = poolItems.length || "";
+    const catsEl = row.querySelector(".tier-col-cats");
+    if (catsEl) catsEl.innerHTML = catTallyInner(poolItems);
+  }
+}
+
+// Flytter selve chip-elementet i DOM-en (ikke re-render) og patcher kun
+// tekst-hodene på gammel+ny beholder — bildet inni blir aldri ødelagt/lastet på nytt.
+function moveTierChipDom(itemId, targetItemsEl) {
+  const main = document.getElementById("main");
+  const chipEl = main.querySelector(`.tier-chip[data-id="${itemId}"]`);
+  if (!chipEl || !targetItemsEl) return false;
+  const oldItemsEl = chipEl.closest(".tier-items");
+  chipEl.classList.remove("tier-chip-dragging");
+  const wrap = chipEl.closest(".tier-chip-wrap") || chipEl;
+  targetItemsEl.appendChild(wrap);
+  if (oldItemsEl && oldItemsEl !== targetItemsEl) patchTierHeads(oldItemsEl);
+  patchTierHeads(targetItemsEl);
+  return true;
 }
 
 function updateTierBadge() {
@@ -770,7 +831,12 @@ function setupTierDrag() {
       item.tier = newTier;
       if (newStatus && item.status !== "sparer_til") item.status = newStatus;
       if (navigator.vibrate) navigator.vibrate(6);
-      setTimeout(() => { d.ghost.remove(); render(); save(); }, 160);
+      setTimeout(() => {
+        d.ghost.remove();
+        moveTierChipDom(d.id, target);
+        updateTierBadge();
+        save();
+      }, 160);
     } else {
       d.ghost.remove();
     }
