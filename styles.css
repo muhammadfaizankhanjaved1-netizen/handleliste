@@ -520,23 +520,34 @@ body {
 }
 .tier-board *, .card-sorter * { -webkit-tap-highlight-color: transparent; }
 .tier-board { padding: 4px 16px 20px; display: flex; flex-direction: column; gap: 10px; }
-.tier-row { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px; }
+.tier-row { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
 .tier-pool-row { border-style: dashed; }
+
+/* Sammenslått hode — alltid synlig, trykkbart, uavhengig åpen/lukket per rad */
 .tier-row-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 7px 10px; border-radius: 10px; margin-bottom: 8px;
-  background: oklch(0.58 0.13 var(--tierHue, 90) / 0.16);
+  display: flex; align-items: center; gap: 9px; padding: 13px 14px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; user-select: none; touch-action: manipulation;
 }
-.tier-row-name { font-size: .82rem; font-weight: 700; color: var(--ink); }
-.tier-row-sum { font-family: "DM Mono", monospace; font-size: .72rem; font-weight: 600; color: var(--faint); }
-.tier-pool-head { background: color-mix(in srgb, var(--faint) 16%, transparent); }
-.tier-cols { display: flex; gap: 8px; }
+.tier-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; background: oklch(0.58 0.15 var(--tierHue,90)); }
+.tier-pool-row .tier-dot { background: var(--faint); }
+.tier-row-name { font-size: .84rem; font-weight: 700; color: var(--ink); flex-shrink: 0; }
+.tier-row-meta { flex: 1; display: flex; gap: 9px; align-items: center; overflow: hidden; }
+.tier-row-count-sum { font-family: "DM Mono", monospace; font-size: .68rem; color: var(--faint); white-space: nowrap; flex-shrink: 0; }
+.tier-row-cats { display: flex; gap: 4px; overflow: hidden; }
+.tier-chevron { flex-shrink: 0; transition: transform .2s; color: var(--faint); font-size: .78rem; }
+.tier-row.open .tier-chevron { transform: rotate(180deg); }
+
+/* Body — høyden settes eksakt via JS (scrollHeight) ved åpning, alltid 0 ved
+   lukking, så ingen sliver av bobler vises før raden faktisk er åpnet. */
+.tier-row-body-wrap { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+.tier-cols { display: flex; gap: 8px; padding: 0 12px 12px; }
 .tier-col { flex: 1; min-width: 0; }
 .tier-col-label { font-size: .68rem; font-weight: 600; color: var(--faint); margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; gap: 5px; }
 .tier-col-count { font-family: "DM Mono", monospace; opacity: .7; }
 .tier-col-sum { font-family: "DM Mono", monospace; font-size: .64rem; color: var(--faint); font-weight: 600; flex-shrink: 0; }
 .tier-col-cats { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
-.cat-tally { font-size: .62rem; font-weight: 600; color: var(--chipInk); background: var(--sheet); border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; }
+.cat-tally { font-size: .62rem; font-weight: 600; color: var(--chipInk); background: var(--sheet); border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; white-space: nowrap; }
+.tier-pool-body { padding: 0 12px 12px; }
 .tier-items {
   display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;
   min-height: 58px; border-radius: 10px; padding: 4px; transition: background .15s, outline .15s;

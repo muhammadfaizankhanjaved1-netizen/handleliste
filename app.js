@@ -582,7 +582,7 @@ function tierChip(item) {
 }
 
 function tierColHeadHtml(statusVal, items) {
-  const label = statusVal === "ønske" ? "Ønsker meg" : "Ser på";
+  const label = statusVal === "ønske" ? "Høy ønske" : "Vil ha det";
   const sum = items.reduce((s, i) => s + (i.price_current || 0), 0);
   return `<span>${label} <span class="tier-col-count">${items.length}</span></span>${sum ? `<span class="tier-col-sum">${fmt(sum)}</span>` : ""}`;
 }
@@ -593,6 +593,13 @@ function tierColHtml(tierKey, statusVal, items) {
     ${catTallyHtml(items)}
     <div class="tier-items" data-tier="${tierKey}" data-status="${statusVal}">${items.map(tierChip).join("")}</div>
   </div>`;
+}
+
+// Rad-hodets sammendrag (synlig selv når raden er lukket): antall, sum og
+// kategorifordeling for HELE tieren (begge kolonner slått sammen).
+function tierRowMetaHtml(items) {
+  const sum = items.reduce((s, i) => s + (i.price_current || 0), 0);
+  return `<span class="tier-row-count-sum">${items.length}${sum ? " · " + fmt(sum) : ""}</span><span class="tier-row-cats">${catTallyInner(items)}</span>`;
 }
 
 function renderTierBoard() {
@@ -608,25 +615,52 @@ function renderTierBoard() {
     const inTier = items.filter(i => i.tier === t.key);
     const onske  = inTier.filter(i => tierColumnOf(i) === "ønske");
     const serpa  = inTier.filter(i => tierColumnOf(i) === "ser_på");
-    const sum    = inTier.reduce((s, i) => s + (i.price_current || 0), 0);
-    html += `<div class="tier-row">
-      <div class="tier-row-head" style="--tierHue:${t.hue}">
+    html += `<div class="tier-row" data-key="${t.key}">
+      <div class="tier-row-head" style="--tierHue:${t.hue}" onclick="toggleTierRow('${t.key}')">
+        <span class="tier-dot"></span>
         <span class="tier-row-name">${t.label}</span>
-        <span class="tier-row-sum">${sum ? fmt(sum) : ""}</span>
+        <span class="tier-row-meta">${tierRowMetaHtml(inTier)}</span>
+        <span class="tier-chevron">▾</span>
       </div>
-      <div class="tier-cols">
-        ${tierColHtml(t.key, "ønske", onske)}
-        ${tierColHtml(t.key, "ser_på", serpa)}
+      <div class="tier-row-body-wrap">
+        <div class="tier-cols">
+          ${tierColHtml(t.key, "ønske", onske)}
+          ${tierColHtml(t.key, "ser_på", serpa)}
+        </div>
       </div>
     </div>`;
   });
-  html += `<div class="tier-row tier-pool-row">
-      <div class="tier-row-head tier-pool-head"><span class="tier-row-name">Usortert</span><span class="tier-row-sum">${pool.length || ""}</span></div>
-      ${catTallyHtml(pool)}
-      <div class="tier-items tier-pool-items" data-tier="" data-status="">${pool.map(tierChip).join("")}</div>
+  html += `<div class="tier-row tier-pool-row" data-key="">
+      <div class="tier-row-head" onclick="toggleTierRow('')">
+        <span class="tier-dot"></span>
+        <span class="tier-row-name">Usortert</span>
+        <span class="tier-row-meta">${tierRowMetaHtml(pool)}</span>
+        <span class="tier-chevron">▾</span>
+      </div>
+      <div class="tier-row-body-wrap">
+        <div class="tier-pool-body">
+          <div class="tier-items tier-pool-items" data-tier="" data-status="">${pool.map(tierChip).join("")}</div>
+        </div>
+      </div>
     </div>`;
   html += `</div>`;
   return html;
+}
+
+// Uavhengige seksjoner — flere kan stå åpne samtidig. max-height settes til
+// eksakt målt innholdshøyde ved åpning, og til 0 ved lukking, så det aldri
+// lekker en sliver av bobler før raden faktisk er åpnet.
+function toggleTierRow(key) {
+  const row = document.querySelector(`.tier-row[data-key="${key}"]`);
+  if (!row) return;
+  const wrap = row.querySelector(".tier-row-body-wrap");
+  const nowOpen = row.classList.toggle("open");
+  wrap.style.maxHeight = nowOpen ? wrap.scrollHeight + "px" : "0px";
+}
+function refreshTierRowHeight(row) {
+  if (!row || !row.classList.contains("open")) return;
+  const wrap = row.querySelector(".tier-row-body-wrap");
+  if (wrap) wrap.style.maxHeight = wrap.scrollHeight + "px";
 }
 
 // ── Kort-modus (rask førstegangssortering av usorterte varer) ──────────────
@@ -643,8 +677,8 @@ function renderCardSorter() {
   const rows = TIERS.map(t => `
     <div class="cs-row">
       <span class="cs-row-label" style="--tierHue:${t.hue}">${t.label}</span>
-      <button type="button" class="cs-btn" onclick="cardSortPlace('${item.id}','${t.key}','ønske')">Ønsker meg</button>
-      <button type="button" class="cs-btn cs-btn-secondary" onclick="cardSortPlace('${item.id}','${t.key}','ser_på')">Ser på</button>
+      <button type="button" class="cs-btn" onclick="cardSortPlace('${item.id}','${t.key}','ønske')">Høy ønske</button>
+      <button type="button" class="cs-btn cs-btn-secondary" onclick="cardSortPlace('${item.id}','${t.key}','ser_på')">Vil ha det</button>
     </div>`).join("");
 
   return `<div class="card-sorter">
@@ -697,6 +731,7 @@ function patchTierHeads(itemsEl) {
   const statusVal = itemsEl.dataset.status || null;
   const row = itemsEl.closest(".tier-row");
   if (!row) return;
+  const metaEl = row.querySelector(".tier-row-meta");
   if (tierKey) {
     const col = itemsEl.closest(".tier-col");
     const colItems = tierBoardItems().filter(i => i.tier === tierKey && tierColumnOf(i) === statusVal);
@@ -706,16 +741,12 @@ function patchTierHeads(itemsEl) {
       if (catsEl) catsEl.innerHTML = catTallyInner(colItems);
     }
     const rowItems = tierBoardItems().filter(i => i.tier === tierKey);
-    const rowSum = rowItems.reduce((s, i) => s + (i.price_current || 0), 0);
-    const rowSumEl = row.querySelector(".tier-row-sum");
-    if (rowSumEl) rowSumEl.textContent = rowSum ? fmt(rowSum) : "";
+    if (metaEl) metaEl.innerHTML = tierRowMetaHtml(rowItems);
   } else {
     const poolItems = tierPoolItems();
-    const rowSumEl = row.querySelector(".tier-row-sum");
-    if (rowSumEl) rowSumEl.textContent = poolItems.length || "";
-    const catsEl = row.querySelector(".tier-col-cats");
-    if (catsEl) catsEl.innerHTML = catTallyInner(poolItems);
+    if (metaEl) metaEl.innerHTML = tierRowMetaHtml(poolItems);
   }
+  refreshTierRowHeight(row);
 }
 
 // Flytter selve chip-elementet i DOM-en (ikke re-render) og patcher kun
@@ -763,6 +794,33 @@ function tierAutoScroll() {
   tierScrollRAF = requestAnimationFrame(tierAutoScroll);
 }
 
+// Rader er lukket som standard, så .tier-items inni en lukket rad har ingen
+// synlig piksel å treffe med elementFromPoint. Holder man en vare over en
+// lukket rads hode en liten stund under en drag, åpnes den automatisk slik
+// at man faktisk kan slippe varen der.
+let tierHoverTimer = null, tierHoverKey = null;
+function clearTierHover() {
+  if (tierHoverTimer) { clearTimeout(tierHoverTimer); tierHoverTimer = null; }
+  tierHoverKey = null;
+}
+function handleTierDragHover(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const row = el ? el.closest(".tier-row") : null;
+  const key = row ? row.dataset.key : null;
+  if (key === tierHoverKey) return;
+  clearTierHover();
+  tierHoverKey = key;
+  if (row && !row.classList.contains("open")) {
+    tierHoverTimer = setTimeout(() => {
+      if (tierDrag && tierHoverKey === key) {
+        row.classList.add("open");
+        const wrap = row.querySelector(".tier-row-body-wrap");
+        if (wrap) wrap.style.maxHeight = wrap.scrollHeight + "px";
+      }
+    }, 350);
+  }
+}
+
 function setupTierDrag() {
   const main = document.getElementById("main");
 
@@ -807,6 +865,7 @@ function setupTierDrag() {
     tierDrag.ghost.style.top  = (e.clientY - tierDrag.offsetY) + "px";
     document.querySelectorAll(".tier-items.drag-over").forEach(el => el.classList.remove("drag-over"));
     tierDrag.ghost.style.visibility = "hidden";
+    handleTierDragHover(e.clientX, e.clientY);
     const target = resolveTierDropTarget(e.clientX, e.clientY);
     tierDrag.ghost.style.visibility = "";
     if (target) target.classList.add("drag-over");
@@ -815,6 +874,7 @@ function setupTierDrag() {
   function endDrag(e) {
     if (!tierDrag) return;
     document.querySelectorAll(".tier-items.drag-over").forEach(el => el.classList.remove("drag-over"));
+    clearTierHover();
     const d = tierDrag; tierDrag = null;
     if (!d.moved) { return; }
     d.ghost.style.visibility = "hidden";
