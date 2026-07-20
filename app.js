@@ -580,8 +580,12 @@ function tierChip(item) {
 
 function tierColHtml(tierKey, statusVal, items) {
   const label = statusVal === "ønske" ? "Ønsker meg" : "Ser på";
+  const sum = items.reduce((s, i) => s + (i.price_current || 0), 0);
   return `<div class="tier-col">
-    <div class="tier-col-label">${label} <span class="tier-col-count">${items.length}</span></div>
+    <div class="tier-col-label">
+      <span>${label} <span class="tier-col-count">${items.length}</span></span>
+      ${sum ? `<span class="tier-col-sum">${fmt(sum)}</span>` : ""}
+    </div>
     ${catTallyHtml(items)}
     <div class="tier-items" data-tier="${tierKey}" data-status="${statusVal}">${items.map(tierChip).join("")}</div>
   </div>`;
@@ -705,6 +709,10 @@ function setupTierDrag() {
     if (view !== "tier") return;
     const chip = e.target.closest(".tier-chip");
     if (!chip) return;
+    // Kveler native tekst-seleksjon/bilde-drag/callout med en gang — uten dette
+    // kan nettleseren "vinne" berøringen før JS-terskelen under rekker å reagere,
+    // og du ender med å markere tekst i stedet for å dra boblen.
+    e.preventDefault();
     const rect = chip.getBoundingClientRect();
     tierDrag = {
       id: chip.dataset.id, pointerId: e.pointerId,
@@ -712,14 +720,14 @@ function setupTierDrag() {
       offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
       w: rect.width, h: rect.height, moved: false, ghost: null,
     };
-  });
+  }, { passive: false });
 
   main.addEventListener("pointermove", e => {
     if (!tierDrag || e.pointerId !== tierDrag.pointerId) return;
     tierDrag.lastY = e.clientY;
     const dx = e.clientX - tierDrag.startX, dy = e.clientY - tierDrag.startY;
     if (!tierDrag.moved) {
-      if (Math.hypot(dx, dy) < 8) return;
+      if (Math.hypot(dx, dy) < 4) return;
       tierDrag.moved = true;
       main.setPointerCapture(e.pointerId);
       const src = main.querySelector(`.tier-chip[data-id="${tierDrag.id}"]`);

@@ -515,6 +515,10 @@ body {
 }
 
 /* ── PRIORITER (tier-brett) ── */
+.tier-board, .card-sorter {
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.tier-board *, .card-sorter * { -webkit-tap-highlight-color: transparent; }
 .tier-board { padding: 4px 16px 20px; display: flex; flex-direction: column; gap: 10px; }
 .tier-row { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px; }
 .tier-pool-row { border-style: dashed; }
@@ -528,8 +532,9 @@ body {
 .tier-pool-head { background: color-mix(in srgb, var(--faint) 16%, transparent); }
 .tier-cols { display: flex; gap: 8px; }
 .tier-col { flex: 1; min-width: 0; }
-.tier-col-label { font-size: .68rem; font-weight: 600; color: var(--faint); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+.tier-col-label { font-size: .68rem; font-weight: 600; color: var(--faint); margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; gap: 5px; }
 .tier-col-count { font-family: "DM Mono", monospace; opacity: .7; }
+.tier-col-sum { font-family: "DM Mono", monospace; font-size: .64rem; color: var(--faint); font-weight: 600; flex-shrink: 0; }
 .tier-col-cats { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .cat-tally { font-size: .62rem; font-weight: 600; color: var(--chipInk); background: var(--sheet); border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; }
 .tier-items {
@@ -542,12 +547,17 @@ body {
 .tier-chip-wrap { display: flex; flex-direction: column; align-items: center; width: 56px; }
 .tier-chip {
   width: 50px; height: 50px; border-radius: 50%; overflow: hidden; position: relative; flex-shrink: 0;
-  background: var(--saveTrack); border: 2px solid var(--card);
+  background: #fff; border: 2px solid var(--card);
   box-shadow: 0 2px 6px -2px rgba(20,16,8,0.45); cursor: grab; touch-action: none;
+  -webkit-tap-highlight-color: transparent; transition: transform .1s;
 }
-.tier-chip img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.tier-chip:active { transform: scale(.92); }
+.tier-chip img {
+  width: 100%; height: 100%; object-fit: contain; display: block; padding: 3px;
+  pointer-events: none; -webkit-user-drag: none; user-drag: none;
+}
 .tier-chip .placeholder { width: 100%; height: 100%; }
-.tier-chip-dragging { opacity: .3; }
+.tier-chip-dragging { opacity: .3; transform: none; }
 .tier-chip-ghost {
   position: fixed; z-index: 500; pointer-events: none; box-shadow: 0 14px 30px -10px rgba(20,16,8,0.55);
   transform: scale(1.15); opacity: .96; cursor: grabbing;
