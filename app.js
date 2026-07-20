@@ -19,6 +19,13 @@ const THEME_CYCLE = ["warm","skog","skifer","plomme","dark","bw","navy","oldmone
 const THEME_LABELS = { warm:"Varm leire", skog:"Skog", skifer:"Kjølig skifer", plomme:"Plomme", dark:"Mørk antrasitt", bw:"Svart/hvit", navy:"Marineblå", oldmoney:"Old money" };
 const SORT_CYCLE = ["newest","month","price_desc","name","oldest"];
 const SORT_LABELS = { newest:"Nyeste", month:"Måned", price_desc:"Pris", name:"Navn", oldest:"Gamleste" };
+const TIERS = [
+  { key: "s", label: "Kjøp ved neste anledning", hue: 25  },
+  { key: "a", label: "Kjøp snart",               hue: 55  },
+  { key: "b", label: "Kjøp etterhvert",          hue: 95  },
+  { key: "c", label: "Kan vente",                hue: 145 },
+  { key: "d", label: "Lav prioritet",            hue: 255 },
+];
 
 // ── State ────────────────────────────────────────────────────────────────────
 let data = { categories: CATEGORIES, items: [] };
@@ -531,6 +538,239 @@ function renderTotals() {
   document.getElementById("totals-bar").innerHTML = html;
 }
 
+// ── Prioriter (tier-brett) ──────────────────────────────────────────────────
+// Bestilt/kjøpt er allerede avgjort og skal ikke prioriteres. Kolonnen en vare
+// havner i (Ønsker meg/Ser på) speiler status — sparer_til beholder egen status
+// uansett kolonne den vises i, siden sparingen lever sitt eget liv.
+function tierBoardItems() {
+  return activeItems().filter(i => i.status !== "bestilt");
+}
+function tierPoolItems() {
+  return tierBoardItems().filter(i => !i.tier);
+}
+function tierColumnOf(item) {
+  return item.status === "ser_på" ? "ser_på" : "ønske";
+}
+
+function catTally(items) {
+  const counts = {};
+  items.forEach(i => (i.categories || []).forEach(c => { counts[c] = (counts[c] || 0) + 1; }));
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+}
+function catTallyHtml(items) {
+  const t = catTally(items);
+  if (!t.length) return "";
+  return `<div class="tier-col-cats">${t.map(([c, n]) => `<span class="cat-tally">${CAT_ICONS[c] || "🏷️"} ${n}</span>`).join("")}</div>`;
+}
+
+function tierChip(item) {
+  const [tintA, tintB] = tintFor(item.id);
+  const img = item.image
+    ? `<img src="${item.image}" alt="" loading="lazy" onerror="cardImgError(this,'${tintA}','${tintB}')">`
+    : `<div class="placeholder" style="--tintA:${tintA};--tintB:${tintB}"></div>`;
+  const saveBadge  = item.status === "sparer_til" ? `<span class="tier-badge tier-badge-save">💰</span>` : "";
+  const monthBadge = item.month ? `<span class="tier-badge tier-badge-month">${item.month}</span>` : "";
+  const priceHtml  = item.price_current ? `<div class="tier-chip-price">${fmt(item.price_current)}</div>` : "";
+  const safeName = (item.name || item.url || "").replace(/"/g, "&quot;");
+  return `<div class="tier-chip-wrap">
+    <div class="tier-chip" data-id="${item.id}" title="${safeName}">${img}${saveBadge}${monthBadge}</div>
+    ${priceHtml}
+  </div>`;
+}
+
+function tierColHtml(tierKey, statusVal, items) {
+  const label = statusVal === "ønske" ? "Ønsker meg" : "Ser på";
+  return `<div class="tier-col">
+    <div class="tier-col-label">${label} <span class="tier-col-count">${items.length}</span></div>
+    ${catTallyHtml(items)}
+    <div class="tier-items" data-tier="${tierKey}" data-status="${statusVal}">${items.map(tierChip).join("")}</div>
+  </div>`;
+}
+
+function renderTierBoard() {
+  const items = tierBoardItems();
+  const pool = items.filter(i => !i.tier);
+
+  if (!items.length) {
+    return `<div class="empty"><div class="empty-icon">🏆</div><p>Ingen varer å prioritere ennå.</p></div>`;
+  }
+
+  let html = `<div class="tier-board">`;
+  TIERS.forEach(t => {
+    const inTier = items.filter(i => i.tier === t.key);
+    const onske  = inTier.filter(i => tierColumnOf(i) === "ønske");
+    const serpa  = inTier.filter(i => tierColumnOf(i) === "ser_på");
+    const sum    = inTier.reduce((s, i) => s + (i.price_current || 0), 0);
+    html += `<div class="tier-row">
+      <div class="tier-row-head" style="--tierHue:${t.hue}">
+        <span class="tier-row-name">${t.label}</span>
+        <span class="tier-row-sum">${sum ? fmt(sum) : ""}</span>
+      </div>
+      <div class="tier-cols">
+        ${tierColHtml(t.key, "ønske", onske)}
+        ${tierColHtml(t.key, "ser_på", serpa)}
+      </div>
+    </div>`;
+  });
+  html += `<div class="tier-row tier-pool-row">
+      <div class="tier-row-head tier-pool-head"><span class="tier-row-name">Usortert</span><span class="tier-row-sum">${pool.length || ""}</span></div>
+      ${catTallyHtml(pool)}
+      <div class="tier-items tier-pool-items" data-tier="" data-status="">${pool.map(tierChip).join("")}</div>
+    </div>`;
+  html += `</div>`;
+  return html;
+}
+
+// ── Kort-modus (rask førstegangssortering av usorterte varer) ──────────────
+let cardSorterDismissed = false;
+
+function renderCardSorter() {
+  const pool = tierPoolItems();
+  if (!pool.length) return "";
+  const item = pool[0];
+  const [tintA, tintB] = tintFor(item.id);
+  const img = item.image
+    ? `<img src="${item.image}" alt="" onerror="cardImgError(this,'${tintA}','${tintB}')">`
+    : `<div class="placeholder" style="--tintA:${tintA};--tintB:${tintB}"></div>`;
+  const rows = TIERS.map(t => `
+    <div class="cs-row">
+      <span class="cs-row-label" style="--tierHue:${t.hue}">${t.label}</span>
+      <button type="button" class="cs-btn" onclick="cardSortPlace('${item.id}','${t.key}','ønske')">Ønsker meg</button>
+      <button type="button" class="cs-btn cs-btn-secondary" onclick="cardSortPlace('${item.id}','${t.key}','ser_på')">Ser på</button>
+    </div>`).join("");
+
+  return `<div class="card-sorter">
+    <div class="cs-eyebrow">Sorter varer · ${pool.length} igjen</div>
+    <div class="cs-card">
+      <div class="cs-img">${img}</div>
+      <div class="cs-name">${item.name || item.url}</div>
+      ${item.price_current ? `<div class="cs-price">${fmt(item.price_current)}</div>` : ""}
+    </div>
+    <div class="cs-grid">${rows}</div>
+    <button type="button" class="cs-skip" onclick="cardSortSkip()">Se hele brettet i stedet →</button>
+  </div>`;
+}
+
+function cardSortPlace(id, tierKey, statusVal) {
+  const item = data.items.find(i => i.id === id);
+  if (!item) return;
+  item.tier = tierKey;
+  if (item.status !== "sparer_til") item.status = statusVal;
+  render();
+  save();
+  if (navigator.vibrate) navigator.vibrate(6);
+}
+function cardSortSkip() { cardSorterDismissed = true; render(); }
+
+function renderTier() {
+  const pool = tierPoolItems();
+  const showCards = pool.length > 0 && !cardSorterDismissed;
+  document.getElementById("main").innerHTML = (showCards ? renderCardSorter() : "") + renderTierBoard();
+}
+
+function updateTierBadge() {
+  const el = document.getElementById("nav-tier-badge");
+  if (!el) return;
+  const n = tierPoolItems().length;
+  el.textContent = n;
+  el.style.display = n > 0 ? "flex" : "none";
+}
+
+// ── Dra-og-slipp i prioriterings-brettet (pointer events → touch + mus) ────
+let tierDrag = null;
+let tierScrollRAF = null;
+
+function resolveTierDropTarget(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  if (el.closest(".tier-items")) return el.closest(".tier-items");
+  const col = el.closest(".tier-col, .tier-pool-row");
+  return col ? col.querySelector(".tier-items") : null;
+}
+
+function tierAutoScroll() {
+  if (!tierDrag || !tierDrag.moved) { tierScrollRAF = null; return; }
+  const y = tierDrag.lastY, margin = 70, maxSpeed = 16, vh = window.innerHeight;
+  let dy = 0;
+  if (y < margin) dy = -maxSpeed * (1 - y / margin);
+  else if (y > vh - margin) dy = maxSpeed * (1 - (vh - y) / margin);
+  if (dy) window.scrollBy(0, dy);
+  tierScrollRAF = requestAnimationFrame(tierAutoScroll);
+}
+
+function setupTierDrag() {
+  const main = document.getElementById("main");
+
+  main.addEventListener("pointerdown", e => {
+    if (view !== "tier") return;
+    const chip = e.target.closest(".tier-chip");
+    if (!chip) return;
+    const rect = chip.getBoundingClientRect();
+    tierDrag = {
+      id: chip.dataset.id, pointerId: e.pointerId,
+      startX: e.clientX, startY: e.clientY, lastY: e.clientY,
+      offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
+      w: rect.width, h: rect.height, moved: false, ghost: null,
+    };
+  });
+
+  main.addEventListener("pointermove", e => {
+    if (!tierDrag || e.pointerId !== tierDrag.pointerId) return;
+    tierDrag.lastY = e.clientY;
+    const dx = e.clientX - tierDrag.startX, dy = e.clientY - tierDrag.startY;
+    if (!tierDrag.moved) {
+      if (Math.hypot(dx, dy) < 8) return;
+      tierDrag.moved = true;
+      main.setPointerCapture(e.pointerId);
+      const src = main.querySelector(`.tier-chip[data-id="${tierDrag.id}"]`);
+      if (!src) { tierDrag = null; return; }
+      const ghost = src.cloneNode(true);
+      ghost.className = "tier-chip tier-chip-ghost";
+      ghost.style.width = tierDrag.w + "px";
+      ghost.style.height = tierDrag.h + "px";
+      document.body.appendChild(ghost);
+      tierDrag.ghost = ghost;
+      src.classList.add("tier-chip-dragging");
+      if (!tierScrollRAF) tierScrollRAF = requestAnimationFrame(tierAutoScroll);
+    }
+    e.preventDefault();
+    tierDrag.ghost.style.left = (e.clientX - tierDrag.offsetX) + "px";
+    tierDrag.ghost.style.top  = (e.clientY - tierDrag.offsetY) + "px";
+    document.querySelectorAll(".tier-items.drag-over").forEach(el => el.classList.remove("drag-over"));
+    tierDrag.ghost.style.visibility = "hidden";
+    const target = resolveTierDropTarget(e.clientX, e.clientY);
+    tierDrag.ghost.style.visibility = "";
+    if (target) target.classList.add("drag-over");
+  }, { passive: false });
+
+  function endDrag(e) {
+    if (!tierDrag) return;
+    document.querySelectorAll(".tier-items.drag-over").forEach(el => el.classList.remove("drag-over"));
+    const d = tierDrag; tierDrag = null;
+    if (!d.moved) { return; }
+    d.ghost.style.visibility = "hidden";
+    const target = resolveTierDropTarget(e.clientX, e.clientY);
+    d.ghost.style.visibility = "";
+    const item = data.items.find(i => i.id === d.id);
+    if (target && item) {
+      const tRect = target.getBoundingClientRect();
+      d.ghost.style.transition = "left .18s cubic-bezier(.22,1,.36,1), top .18s cubic-bezier(.22,1,.36,1)";
+      d.ghost.style.left = (tRect.left + 10) + "px";
+      d.ghost.style.top  = (tRect.top + 10) + "px";
+      const newTier   = target.dataset.tier || null;
+      const newStatus = target.dataset.status || null;
+      item.tier = newTier;
+      if (newStatus && item.status !== "sparer_til") item.status = newStatus;
+      if (navigator.vibrate) navigator.vibrate(6);
+      setTimeout(() => { d.ghost.remove(); render(); save(); }, 160);
+    } else {
+      d.ghost.remove();
+    }
+  }
+  main.addEventListener("pointerup", endDrag);
+  main.addEventListener("pointercancel", endDrag);
+}
+
 function render() {
   renderTotals();
   const showListChrome = view === "wishlist";
@@ -543,12 +783,19 @@ function render() {
   } else {
     document.getElementById("pending-bar").innerHTML = "";
     document.getElementById("filter-bar").innerHTML = "";
-    if (view === "months") renderMonths(); else renderArchive();
+    if (view === "months") renderMonths();
+    else if (view === "tier") renderTier();
+    else renderArchive();
   }
+  updateTierBadge();
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
   document.getElementById(`nav-${view}`).classList.add("active");
 }
-function setView(v) { view = v; render(); }
+function setView(v) {
+  view = v;
+  if (v === "tier") cardSorterDismissed = false;
+  render();
+}
 
 // ── Boble-oversikt (klyp for å zoome ut → gruppert etter kategori) ─────────────
 let bubblesOpen = false;
@@ -747,7 +994,7 @@ async function addItem(url) {
     image:  null,
     price_current: manualPrice,
     price_history: manualPrice ? [{ date: now.slice(0,10), price: manualPrice }] : [],
-    currency: "NOK", saved: 0,
+    currency: "NOK", saved: 0, tier: null,
     categories: [], subcategory: "", month: null, notes: "",
     last_error: null, added_at: now, purchased_at: null,
   };
@@ -894,7 +1141,7 @@ async function saveEdit() {
       image: imgVal && imgVal.startsWith("http") ? imgVal : null,
       price_current: newPrice,
       price_history: newPrice ? [{ date: now.slice(0,10), price: newPrice }] : [],
-      currency: "NOK", saved: 0,
+      currency: "NOK", saved: 0, tier: null,
       categories: cats, subcategory: "", month, notes,
       last_error: null, added_at: now, purchased_at: status === "kjøpt" ? now : null,
     };
@@ -1021,6 +1268,7 @@ async function boot() {
   document.addEventListener("keydown", e => { if (e.key === "Escape" && bubblesOpen) closeBubbles(); });
   setupPinchGestures();
   setupBubbleOutsideTap();
+  setupTierDrag();
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
