@@ -114,17 +114,6 @@
     </div>
 
     <div class="modal-row">
-      <label>Måned</label>
-      <select id="edit-month">
-        <option value="">— Ingen —</option>
-        <option>Jan</option><option>Feb</option><option>Mar</option>
-        <option>Apr</option><option>Mai</option><option>Jun</option>
-        <option>Jul</option><option>Aug</option><option>Sep</option>
-        <option>Okt</option><option>Nov</option><option>Des</option>
-      </select>
-    </div>
-
-    <div class="modal-row">
       <label>Pris</label>
       <div class="currency-select-row">
         <input type="number" id="edit-price" placeholder="0" min="0" oninput="updateCurrencyPreview()" style="flex:1">
@@ -208,13 +197,6 @@
             d="M4 6h16M4 6a2 2 0 100-4 2 2 0 000 4zm0 7h11M4 13a2 2 0 100-4 2 2 0 000 4zm0 7h6M4 20a2 2 0 100-4 2 2 0 000 4z"/>
     </svg>
     Prioriter
-  </button>
-  <button class="nav-btn" id="nav-months" onclick="setView('months')">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-    </svg>
-    Måneder
   </button>
   <button class="nav-btn" id="nav-archive" onclick="setView('archive')">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

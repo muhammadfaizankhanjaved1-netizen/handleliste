@@ -3,7 +3,6 @@ const BIN_KEY = "$2a$10$YQtpXheoXVrQaXo3Sch4G..IWw/ZuAWYFnc1XPBxa82aBCieCR6XC";
 const BIN_ID  = "6a1007006877513b27b2fcfe";
 const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 const CATEGORIES = ["Skole", "Klær", "Fritid", "Gym", "Jobb", "Arbeid"];
-const MONTHS = ["Jan","Feb","Mar","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Des"];
 const CAT_ICONS = { "Skole": "🎓", "Klær": "👕", "Fritid": "🎮", "Gym": "🏋️", "Jobb": "💼", "Arbeid": "🔧" };
 const EDITABLE_STATUSES = ["ser_på","ønske","sparer_til","bestilt","kjøpt"];
 const STATUS_LABELS = { pending:"Henter...", ser_på:"Ser på", ønske:"Ønske", sparer_til:"Sparer til", bestilt:"Bestilt", kjøpt:"Kjøpt" };
@@ -17,8 +16,8 @@ const TINTS = [
 const CURRENCY_CYCLE = ["NOK","EUR","USD","GBP","SEK","DKK"];
 const THEME_CYCLE = ["warm","skog","skifer","plomme","dark","bw","navy","oldmoney"];
 const THEME_LABELS = { warm:"Varm leire", skog:"Skog", skifer:"Kjølig skifer", plomme:"Plomme", dark:"Mørk antrasitt", bw:"Svart/hvit", navy:"Marineblå", oldmoney:"Old money" };
-const SORT_CYCLE = ["newest","month","price_desc","name","oldest"];
-const SORT_LABELS = { newest:"Nyeste", month:"Måned", price_desc:"Pris", name:"Navn", oldest:"Gamleste" };
+const SORT_CYCLE = ["newest","price_desc","name","oldest"];
+const SORT_LABELS = { newest:"Nyeste", price_desc:"Pris", name:"Navn", oldest:"Gamleste" };
 const TIERS = [
   { key: "s", label: "Kjøp ved neste anledning", hue: 25  },
   { key: "a", label: "Kjøp snart",               hue: 55  },
@@ -253,7 +252,7 @@ function renderCard(item, index, archived = false) {
   }
   const pillCls = STATUS_PILL_CLASS[item.status] || "sp-onske";
   const cats = (item.categories || []).join(" · ");
-  const meta = [cats, item.month].filter(Boolean).join(" · ") || "—";
+  const meta = cats || "—";
   const priceHtml = item.price_current
     ? `<div class="card-price">${fmt(item.price_current)}</div>`
     : `<div class="card-price no-price">${item.utsolgt ? "Utsolgt" : "Ingen pris"}</div>`;
@@ -394,10 +393,6 @@ function filteredItems() {
     return true;
   });
   return items.sort((a, b) => {
-    if (sort === "month") {
-      const ai = a.month ? MONTHS.indexOf(a.month) : 99, bi = b.month ? MONTHS.indexOf(b.month) : 99;
-      return ai - bi;
-    }
     if (sort === "price_desc") return (b.price_current || 0) - (a.price_current || 0);
     if (sort === "name")       return (a.name || "").localeCompare(b.name || "", "nb");
     if (sort === "oldest")     return new Date(a.added_at || 0) - new Date(b.added_at || 0);
@@ -483,36 +478,6 @@ function renderWishlist() {
   main.innerHTML = `<div class="gallery">${items.map((it, idx) => renderCard(it, idx)).join("")}</div>`;
 }
 
-function renderMonths() {
-  const items = activeItems();
-  const byMonth = {};
-  MONTHS.forEach(m => { byMonth[m] = []; });
-  const noMonth = [];
-  items.forEach(i => { if (i.month && byMonth[i.month]) byMonth[i.month].push(i); else if (!i.month) noMonth.push(i); });
-
-  let html = "";
-  MONTHS.forEach(m => {
-    const list = byMonth[m];
-    if (!list.length) return;
-    const sorted = list.slice().sort((a, b) => (b.price_current || 0) - (a.price_current || 0));
-    const total = sorted.reduce((s, i) => s + (i.price_current || 0), 0);
-    html += `<div class="month-group">
-      <div class="month-header"><span>${m}</span><span>${fmt(total)}</span></div>
-      <div class="gallery">${sorted.map((it, idx) => renderCard(it, idx)).join("")}</div>
-    </div>`;
-  });
-  if (noMonth.length) {
-    const sorted = noMonth.slice().sort((a, b) => (b.price_current || 0) - (a.price_current || 0));
-    const total = sorted.reduce((s, i) => s + (i.price_current || 0), 0);
-    html += `<div class="month-group">
-      <div class="month-header"><span>Uten måned</span><span>${fmt(total)}</span></div>
-      <div class="gallery">${sorted.map((it, idx) => renderCard(it, idx)).join("")}</div>
-    </div>`;
-  }
-  document.getElementById("main").innerHTML = html ||
-    `<div class="empty"><div class="empty-icon">📅</div><p>Ingen planlagte kjøp ennå.</p></div>`;
-}
-
 function renderArchive() {
   const items = data.items.filter(i => i.status === "kjøpt");
   if (!items.length) {
@@ -572,13 +537,12 @@ function tierChip(item) {
     ? `<img src="${item.image}" alt="" loading="lazy" onerror="cardImgError(this,'${tintA}','${tintB}')">`
     : `<div class="placeholder" style="--tintA:${tintA};--tintB:${tintB}"></div>`;
   const saveBadge  = item.status === "sparer_til" ? `<span class="tier-badge tier-badge-save">💰</span>` : "";
-  const monthBadge = item.month ? `<span class="tier-badge tier-badge-month">${item.month}</span>` : "";
   const priceHtml  = item.price_current ? `<div class="tier-chip-price">${fmt(item.price_current)}</div>` : "";
   const safeName = (item.name || item.url || "").replace(/"/g, "&quot;");
   return `<div class="tier-chip-wrap">
     <div class="tier-chip" data-id="${item.id}" title="${safeName}">
       <div class="tier-chip-imgclip">${img}</div>
-      ${saveBadge}${monthBadge}
+      ${saveBadge}
     </div>
     ${priceHtml}
   </div>`;
@@ -944,8 +908,7 @@ function render() {
   } else {
     document.getElementById("pending-bar").innerHTML = "";
     document.getElementById("filter-bar").innerHTML = "";
-    if (view === "months") renderMonths();
-    else if (view === "tier") renderTier();
+    if (view === "tier") renderTier();
     else renderArchive();
   }
   updateTierBadge();
@@ -1156,7 +1119,7 @@ async function addItem(url) {
     price_current: manualPrice,
     price_history: manualPrice ? [{ date: now.slice(0,10), price: manualPrice }] : [],
     currency: "NOK", saved: 0, tier: null,
-    categories: [], subcategory: "", month: null, notes: "",
+    categories: [], subcategory: "", notes: "",
     last_error: null, added_at: now, purchased_at: null,
   };
   data.items.unshift(item);
@@ -1229,7 +1192,6 @@ function openAdd() {
   document.getElementById("edit-url").value = "";
   document.getElementById("edit-open-link").style.display = "none";
   document.getElementById("edit-name").value = "";
-  document.getElementById("edit-month").value = "";
   document.getElementById("edit-notes").value = "";
   document.getElementById("edit-price").value = "";
   document.getElementById("edit-currency").value = "NOK";
@@ -1253,7 +1215,6 @@ function openEdit(id) {
   else openLink.style.display = "none";
   document.getElementById("edit-name").value  = item.name || "";
   document.getElementById("edit-price").value = item.price_current || "";
-  document.getElementById("edit-month").value = item.month || "";
   document.getElementById("edit-notes").value = item.notes || "";
   document.getElementById("edit-currency").value = "NOK";
   document.getElementById("currency-preview").textContent = "";
@@ -1281,7 +1242,6 @@ function closeModal() {
 async function saveEdit() {
   const name  = document.getElementById("edit-name").value.trim();
   const url   = document.getElementById("edit-url").value.trim();
-  const month = document.getElementById("edit-month").value || null;
   const notes = document.getElementById("edit-notes").value.trim();
   const statusEl = document.querySelector('input[name="status-radio"]:checked');
   const status = statusEl ? statusEl.value : "ser_på";
@@ -1303,7 +1263,7 @@ async function saveEdit() {
       price_current: newPrice,
       price_history: newPrice ? [{ date: now.slice(0,10), price: newPrice }] : [],
       currency: "NOK", saved: 0, tier: null,
-      categories: cats, subcategory: "", month, notes,
+      categories: cats, subcategory: "", notes,
       last_error: null, added_at: now, purchased_at: status === "kjøpt" ? now : null,
     };
     data.items.unshift(item);
@@ -1322,7 +1282,6 @@ async function saveEdit() {
   if (!item) return;
   item.name   = name || item.name;
   item.url    = url;
-  item.month  = month;
   item.notes  = notes;
   item.status = status;
   if (imgVal && imgVal.startsWith("http")) item.image = imgVal;
