@@ -647,3 +647,14 @@ body {
   .tier-chip { width: 62px; height: 62px; }
   .tier-chip-price { font-size: .68rem; }
 }
+
+/* Samme layout/format overalt — kun skalert opp på større skjermer (zoom
+   forstørrer HELE rendering-treet proporsjonalt: tekst, padding, bilder,
+   knapper — ikke bare skriftstørrelse), så ingenting flytter seg eller ser
+   annerledes ut, det blir bare mer synlig. Telefon (<700px) er urørt. */
+@media (min-width: 700px) and (max-width: 1023px) {
+  body { zoom: 1.18; }
+}
+@media (min-width: 1024px) {
+  body { zoom: 1.4; }
+}
