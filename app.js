@@ -1,3 +1,8 @@
+// Nettleseren prøver ellers å gjenopprette forrige scroll-posisjon ved
+// reload/gjenåpning (PWA fra hjem-skjerm, bfcache) — så uten dette kan appen
+// åpne midt nede i lista i stedet for øverst.
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
 // ── Config ──────────────────────────────────────────────────────────────────
 const BIN_KEY = "$2a$10$YQtpXheoXVrQaXo3Sch4G..IWw/ZuAWYFnc1XPBxa82aBCieCR6XC";
 const BIN_ID  = "6a1007006877513b27b2fcfe";
@@ -765,6 +770,9 @@ function updateTierBadge() {
 // ── Dra-og-slipp i prioriterings-brettet (pointer events → touch + mus) ────
 let tierDrag = null;
 let tierScrollRAF = null;
+// Dobbelttrykk på en boble åpner produktet — kun etter et rent trykk (ingen
+// drag), så det aldri blandes med dra-og-slipp-gesten over.
+let lastTierTap = { id: null, time: 0 };
 
 function resolveTierDropTarget(x, y) {
   const el = document.elementFromPoint(x, y);
@@ -823,6 +831,15 @@ function setupTierDrag() {
     // kan nettleseren "vinne" berøringen før JS-terskelen under rekker å reagere,
     // og du ender med å markere tekst i stedet for å dra boblen.
     e.preventDefault();
+
+    // Andre trykk på samme boble innen 350ms, etter et rent (ikke-dragget)
+    // første trykk → åpne produktet i stedet for å starte en ny drag.
+    if (lastTierTap.id === chip.dataset.id && Date.now() - lastTierTap.time < 350) {
+      lastTierTap = { id: null, time: 0 };
+      openCardLink(chip.dataset.id);
+      return;
+    }
+
     const rect = chip.getBoundingClientRect();
     tierDrag = {
       id: chip.dataset.id, pointerId: e.pointerId,
@@ -867,7 +884,7 @@ function setupTierDrag() {
     document.querySelectorAll(".tier-items.drag-over").forEach(el => el.classList.remove("drag-over"));
     clearTierHover();
     const d = tierDrag; tierDrag = null;
-    if (!d.moved) { return; }
+    if (!d.moved) { lastTierTap = { id: d.id, time: Date.now() }; return; }
     d.ghost.style.visibility = "hidden";
     const target = resolveTierDropTarget(e.clientX, e.clientY);
     d.ghost.style.visibility = "";
@@ -1375,6 +1392,7 @@ async function refreshData() {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function boot() {
+  window.scrollTo(0, 0);
   const savedTheme = localStorage.getItem("hl-theme");
   const migrated = savedTheme === "light" ? "warm" : savedTheme;
   const theme = THEME_CYCLE.includes(migrated) ? migrated : "warm";
@@ -1398,6 +1416,7 @@ async function boot() {
   getExchangeRates();
   await load();
   render();
+  window.scrollTo(0, 0);
   handleSharedUrl();
   startAutoRefresh();
 }
