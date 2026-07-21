@@ -841,11 +841,17 @@ function setupTierDrag() {
     }
 
     const rect = chip.getBoundingClientRect();
+    // PC/iPad-skalering (se @media-reglene i styles.css) bruker CSS "zoom" på
+    // body — det gjør at posisjons-/størrelsesverdier vi setter via JS på et
+    // barn av body blir zoom-multiplisert IGJEN av nettleseren, mens
+    // e.clientX/clientY (fra pekeren) ALDRI er zoom-justert. Uten å dele på
+    // denne faktoren havner "spøkelset" synlig forskjøvet fra selve pekeren.
+    const zoomFactor = (rect.width / (chip.offsetWidth || rect.width)) || 1;
     tierDrag = {
       id: chip.dataset.id, pointerId: e.pointerId,
       startX: e.clientX, startY: e.clientY, lastY: e.clientY,
       offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
-      w: rect.width, h: rect.height, moved: false, ghost: null,
+      w: chip.offsetWidth, h: chip.offsetHeight, zoomFactor, moved: false, ghost: null,
     };
   }, { passive: false });
 
@@ -869,8 +875,8 @@ function setupTierDrag() {
       if (!tierScrollRAF) tierScrollRAF = requestAnimationFrame(tierAutoScroll);
     }
     e.preventDefault();
-    tierDrag.ghost.style.left = (e.clientX - tierDrag.offsetX) + "px";
-    tierDrag.ghost.style.top  = (e.clientY - tierDrag.offsetY) + "px";
+    tierDrag.ghost.style.left = ((e.clientX - tierDrag.offsetX) / tierDrag.zoomFactor) + "px";
+    tierDrag.ghost.style.top  = ((e.clientY - tierDrag.offsetY) / tierDrag.zoomFactor) + "px";
     document.querySelectorAll(".tier-items.drag-over").forEach(el => el.classList.remove("drag-over"));
     tierDrag.ghost.style.visibility = "hidden";
     handleTierDragHover(e.clientX, e.clientY);
@@ -892,8 +898,8 @@ function setupTierDrag() {
     if (target && item) {
       const tRect = target.getBoundingClientRect();
       d.ghost.style.transition = "left .18s cubic-bezier(.22,1,.36,1), top .18s cubic-bezier(.22,1,.36,1)";
-      d.ghost.style.left = (tRect.left + 10) + "px";
-      d.ghost.style.top  = (tRect.top + 10) + "px";
+      d.ghost.style.left = ((tRect.left + 10) / d.zoomFactor) + "px";
+      d.ghost.style.top  = ((tRect.top + 10) / d.zoomFactor) + "px";
       const newTier   = target.dataset.tier || null;
       const newStatus = target.dataset.status || null;
       item.tier = newTier;
