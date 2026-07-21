@@ -576,7 +576,10 @@ function tierChip(item) {
   const priceHtml  = item.price_current ? `<div class="tier-chip-price">${fmt(item.price_current)}</div>` : "";
   const safeName = (item.name || item.url || "").replace(/"/g, "&quot;");
   return `<div class="tier-chip-wrap">
-    <div class="tier-chip" data-id="${item.id}" title="${safeName}">${img}${saveBadge}${monthBadge}</div>
+    <div class="tier-chip" data-id="${item.id}" title="${safeName}">
+      <div class="tier-chip-imgclip">${img}</div>
+      ${saveBadge}${monthBadge}
+    </div>
     ${priceHtml}
   </div>`;
 }
@@ -602,6 +605,11 @@ function tierRowMetaHtml(items) {
   return `<span class="tier-row-count-sum">${items.length}${sum ? " · " + fmt(sum) : ""}</span><span class="tier-row-cats">${catTallyInner(items)}</span>`;
 }
 
+// Hvilke rader brukeren har åpnet, på tvers av re-render (auto-refresh hvert
+// 2. min kaller render() → renderTierBoard() bygger DOM-en helt på nytt, og
+// uten dette huskes ingenting — rader lukket seg selv av seg selv midt i bruk).
+let openTierKeys = new Set();
+
 function renderTierBoard() {
   const items = tierBoardItems();
   const pool = items.filter(i => !i.tier);
@@ -615,7 +623,7 @@ function renderTierBoard() {
     const inTier = items.filter(i => i.tier === t.key);
     const onske  = inTier.filter(i => tierColumnOf(i) === "ønske");
     const serpa  = inTier.filter(i => tierColumnOf(i) === "ser_på");
-    html += `<div class="tier-row" data-key="${t.key}">
+    html += `<div class="tier-row${openTierKeys.has(t.key) ? " open" : ""}" data-key="${t.key}">
       <div class="tier-row-head" style="--tierHue:${t.hue}" onclick="toggleTierRow('${t.key}')">
         <span class="tier-dot"></span>
         <span class="tier-row-name">${t.label}</span>
@@ -630,7 +638,7 @@ function renderTierBoard() {
       </div>
     </div>`;
   });
-  html += `<div class="tier-row tier-pool-row" data-key="">
+  html += `<div class="tier-row tier-pool-row${openTierKeys.has("") ? " open" : ""}" data-key="">
       <div class="tier-row-head" onclick="toggleTierRow('')">
         <span class="tier-dot"></span>
         <span class="tier-row-name">Usortert</span>
@@ -647,6 +655,18 @@ function renderTierBoard() {
   return html;
 }
 
+// Etter innerHTML-rebuild er klassen "open" allerede satt på riktige rader
+// (fra openTierKeys over), men CSS styrer kun via inline max-height — så den
+// må settes eksakt her, FØR nettleseren rekker å male et lukket frame.
+function restoreOpenTierRows() {
+  openTierKeys.forEach(key => {
+    const row = document.querySelector(`.tier-row[data-key="${key}"]`);
+    if (!row) return;
+    const wrap = row.querySelector(".tier-row-body-wrap");
+    if (wrap) wrap.style.maxHeight = wrap.scrollHeight + "px";
+  });
+}
+
 // Uavhengige seksjoner — flere kan stå åpne samtidig. max-height settes til
 // eksakt målt innholdshøyde ved åpning, og til 0 ved lukking, så det aldri
 // lekker en sliver av bobler før raden faktisk er åpnet.
@@ -656,6 +676,7 @@ function toggleTierRow(key) {
   const wrap = row.querySelector(".tier-row-body-wrap");
   const nowOpen = row.classList.toggle("open");
   wrap.style.maxHeight = nowOpen ? wrap.scrollHeight + "px" : "0px";
+  if (nowOpen) openTierKeys.add(key); else openTierKeys.delete(key);
 }
 function refreshTierRowHeight(row) {
   if (!row || !row.classList.contains("open")) return;
@@ -720,6 +741,7 @@ function renderTier() {
   const pool = tierPoolItems();
   const showCards = pool.length > 0 && !cardSorterDismissed;
   document.getElementById("main").innerHTML = (showCards ? renderCardSorter() : "") + renderTierBoard();
+  restoreOpenTierRows();
 }
 
 // Oppdaterer kun tall/sum/kategori-tekst rundt en .tier-items-beholder, uten å
@@ -761,6 +783,10 @@ function moveTierChipDom(itemId, targetItemsEl) {
   targetItemsEl.appendChild(wrap);
   if (oldItemsEl && oldItemsEl !== targetItemsEl) patchTierHeads(oldItemsEl);
   patchTierHeads(targetItemsEl);
+  // Uten dette hopper brikken bare inn i ny plass uten overgang — legg på en
+  // kort landings-pop i stedet (samme fjær-kurve som bubblePop andre steder).
+  chipEl.classList.add("tier-chip-dropped");
+  chipEl.addEventListener("animationend", () => chipEl.classList.remove("tier-chip-dropped"), { once: true });
   return true;
 }
 
@@ -814,6 +840,7 @@ function handleTierDragHover(x, y) {
     tierHoverTimer = setTimeout(() => {
       if (tierDrag && tierHoverKey === key) {
         row.classList.add("open");
+        openTierKeys.add(key);
         const wrap = row.querySelector(".tier-row-body-wrap");
         if (wrap) wrap.style.maxHeight = wrap.scrollHeight + "px";
       }
