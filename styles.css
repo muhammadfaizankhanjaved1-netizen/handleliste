@@ -281,6 +281,13 @@ body {
   font-size: .62rem; font-weight: 700; padding: 3px 8px; border-radius: 999px;
 }
 
+.auguste-badge {
+  display: inline-block; font-size: .66rem; font-weight: 700; padding: 3px 9px;
+  border-radius: 999px; margin-bottom: 6px;
+}
+.auguste-badge-reservert { background: oklch(0.6 0.18 340); color: #fff; }
+.auguste-badge-vurderer  { background: oklch(0.88 0.08 340); color: oklch(0.35 0.12 340); }
+
 .card-body { padding: 12px 13px 14px; }
 .card-name { font-size: .88rem; font-weight: 600; color: var(--ink); line-height: 1.25; margin-bottom: 3px; }
 .card-meta { font-size: .7rem; color: var(--faint); margin-bottom: 6px; }
@@ -416,6 +423,21 @@ body {
 }
 .detail-status-btn:active { transform: scale(.96); }
 .detail-status-btn.active { background: var(--accent); border-color: var(--accent); color: var(--onAccent); }
+
+.detail-auguste-btns { display: flex; gap: 8px; margin-bottom: 12px; }
+.detail-auguste-btn {
+  flex: 1; font-size: .78rem; font-weight: 600; padding: 9px 0; text-align: center;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  cursor: pointer; transition: background .15s, border-color .15s;
+}
+.detail-auguste-btn:active { transform: scale(.96); }
+.detail-auguste-btn.active-vurderer { background: oklch(0.88 0.08 340); border-color: oklch(0.88 0.08 340); color: oklch(0.35 0.12 340); }
+.detail-auguste-btn.active-reservert { background: oklch(0.6 0.18 340); border-color: oklch(0.6 0.18 340); color: #fff; }
+.detail-auguste-label {
+  width: 100%; margin-bottom: 12px; padding: 9px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: .82rem;
+  box-sizing: border-box;
+}
 .detail-footer { display: flex; flex-direction: column; gap: 10px; }
 .detail-url-btn {
   display: block; text-align: center; background: var(--card); border: 1px solid var(--line);
@@ -589,6 +611,7 @@ body {
   background: var(--card); border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(20,16,8,0.3);
 }
 .tier-badge-save { top: -3px; right: -3px; }
+.tier-badge-auguste { top: -3px; left: -3px; }
 
 /* ── KORT-MODUS (rask førstegangssortering) ── */
 .card-sorter { padding: 14px 16px 6px; }

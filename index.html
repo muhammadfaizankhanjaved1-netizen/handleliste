@@ -15,7 +15,7 @@
 <body>
 
 <!-- ── Offline banner ── -->
-<div id="offline-banner" style="display:none;background:#A24A3A;color:#fff;text-align:center;padding:8px 12px;font-size:13px;position:sticky;top:0;z-index:100;">
+<div id="offline-banner" style="display:none;background:#A24A3A;color:#fff;text-align:center;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;font-size:13px;position:sticky;top:0;z-index:100;">
   Offline — viser lagret versjon. Endringer lagres ikke. <button onclick="refreshData()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:2px 10px;border-radius:6px;cursor:pointer;margin-left:8px;">Prøv igjen</button>
 </div>
 
@@ -77,6 +77,8 @@
       <div class="detail-notes" id="detail-notes"></div>
       <div class="detail-section-label">Status</div>
       <div class="detail-status-row" id="detail-status-row"></div>
+      <div class="detail-section-label">🎁 Auguste</div>
+      <div class="detail-auguste-row" id="detail-auguste-row"></div>
       <div class="detail-footer">
         <a class="detail-url-btn" id="detail-url-btn" href="" target="_blank" rel="noopener">Åpne nettbutikk ↗</a>
         <div class="detail-actions">
@@ -197,6 +199,14 @@
             d="M4 6h16M4 6a2 2 0 100-4 2 2 0 000 4zm0 7h11M4 13a2 2 0 100-4 2 2 0 000 4zm0 7h6M4 20a2 2 0 100-4 2 2 0 000 4z"/>
     </svg>
     Prioriter
+  </button>
+  <button class="nav-btn" id="nav-reserved" onclick="setView('reserved')">
+    <span class="nav-badge" id="nav-reserved-badge"></span>
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 8v13M12 8a2.5 2.5 0 10-2.5-2.5c0 1 .7 2.5 2.5 2.5zm0 0a2.5 2.5 0 102.5-2.5c0 1-.7 2.5-2.5 2.5zM5 8h14a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1V9a1 1 0 011-1zm1 5v7a2 2 0 002 2h8a2 2 0 002-2v-7"/>
+    </svg>
+    Reservert
   </button>
   <button class="nav-btn" id="nav-archive" onclick="setView('archive')">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

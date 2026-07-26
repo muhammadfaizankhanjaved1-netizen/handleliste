@@ -4,9 +4,6 @@
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
 // ── Config ──────────────────────────────────────────────────────────────────
-const BIN_KEY = "$2a$10$YQtpXheoXVrQaXo3Sch4G..IWw/ZuAWYFnc1XPBxa82aBCieCR6XC";
-const BIN_ID  = "6a1007006877513b27b2fcfe";
-const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 const CATEGORIES = ["Skole", "Klær", "Fritid", "Gym", "Jobb", "Arbeid"];
 const CAT_ICONS = { "Skole": "🎓", "Klær": "👕", "Fritid": "🎮", "Gym": "🏋️", "Jobb": "💼", "Arbeid": "🔧" };
 const EDITABLE_STATUSES = ["ser_på","ønske","sparer_til","bestilt","kjøpt"];
@@ -63,10 +60,24 @@ async function load() {
       const ok = await save();
       if (!ok) throw new Error("offline-pending");
     }
-    const r = await fetch(`${BIN_URL}/latest`, { headers: { "X-Master-Key": BIN_KEY } });
+    const r = await fetch(`/api/data`, { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
-    const j = await r.json();
-    data = j.record;
+    const cloudData = await r.json();
+    const cloudHasItems = cloudData && Array.isArray(cloudData.items) && cloudData.items.length > 0;
+    if (cloudHasItems) {
+      data = cloudData;
+    } else {
+      // Skyen er tom (f.eks. rett etter migrering til ny lagring) — ikke
+      // stol blindt på det hvis vi har ekte data lokalt. Bruk lokal kopi
+      // og push den opp, i stedet for å late som om varene er borte.
+      const cached = loadCache();
+      if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
+        data = cached;
+        save();
+      } else {
+        data = cloudData;
+      }
+    }
     if (!data.items) data.items = [];
     data.items.forEach(i => { if (typeof i.saved !== "number") i.saved = 0; });
     saveCache(data);
@@ -89,9 +100,9 @@ async function save() {
   // Lokal kopi FØRST — feiler nettet ligger endringen trygt og synkes senere
   saveCache(data);
   try {
-    const r = await fetch(BIN_URL, {
+    const r = await fetch(`/api/data`, {
       method: "PUT",
-      headers: { "X-Master-Key": BIN_KEY, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
     if (!r.ok) throw new Error(r.status);
@@ -208,6 +219,9 @@ function priceDrop(item) {
   if (!h || h.length < 2) return false;
   return h[h.length - 1].price < h[h.length - 2].price;
 }
+function escHtml(s) {
+  return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 function allCategories() {
   const set = new Set(CATEGORIES);
   data.items.forEach(i => (i.categories || []).forEach(c => set.add(c)));
@@ -274,11 +288,16 @@ function renderCard(item, index, archived = false) {
 
   const dropHtml = priceDrop(item) ? `<div class="price-drop-badge">↓</div>` : "";
 
+  const augusteHtml = item.augusteStatus
+    ? `<div class="auguste-badge auguste-badge-${item.augusteStatus}">${item.augusteStatus === "reservert" ? "🎁 Auguste kjøper" : "🤔 Auguste vurderer"}${item.augusteLabel ? " · " + escHtml(item.augusteLabel) : ""}</div>`
+    : "";
+
   return `<div class="card${archived ? " card-archived" : ""}" onclick="openDetail('${item.id}')">
     <div class="card-img-wrap${item.image ? " has-img" : ""}"${item.image ? "" : ` style="height:${h}px"`} onclick="event.stopPropagation();openCardLink('${item.id}')">${imgHtml}</div>
     <div class="status-pill ${pillCls}">${STATUS_LABELS[item.status]}</div>
     ${dropHtml}
     <div class="card-body">
+      ${augusteHtml}
       <div class="card-name">${item.name || item.url}</div>
       <div class="card-meta">${meta}</div>
       ${saveHtml}
@@ -342,11 +361,50 @@ function openDetail(id) {
       onclick="setItemStatus('${item.id}','${s}')">${STATUS_ICONS[s]} ${STATUS_LABELS[s]}</button>`;
   }).join("");
 
+  renderAugusteSection(item);
+
   const urlBtn = document.getElementById("detail-url-btn");
   if (item.url) { urlBtn.href = item.url; urlBtn.style.display = "block"; }
   else urlBtn.style.display = "none";
 
   document.getElementById("detail-overlay").classList.add("open");
+}
+
+// ── Auguste-reservasjon (hun markerer hva hun vurderer/har bestemt seg for å kjøpe) ──
+function renderAugusteSection(item) {
+  const row = document.getElementById("detail-auguste-row");
+  if (!row) return;
+  const st = item.augusteStatus || null;
+  const btn = (key, icon, label) =>
+    `<button type="button" class="detail-auguste-btn${st === key ? ` active-${key}` : ""}"
+      onclick="setAugusteStatus('${item.id}','${key}')">${icon} ${label}</button>`;
+  let html = `<div class="detail-auguste-btns">${btn("vurderer", "🤔", "Vurderer")}${btn("reservert", "🎁", "Reserverer")}</div>`;
+  if (st) {
+    html += `<input type="text" class="detail-auguste-label" id="detail-auguste-label"
+      placeholder="Anledning (valgfritt) – f.eks. Bursdag, Jubileum, Gave"
+      value="${escHtml(item.augusteLabel || "")}" onchange="setAugusteLabel('${item.id}', this.value)">`;
+  }
+  row.innerHTML = html;
+}
+
+async function setAugusteStatus(id, status) {
+  const item = data.items.find(i => i.id === id);
+  if (!item) return;
+  item.augusteStatus = (item.augusteStatus === status) ? null : status;
+  if (!item.augusteStatus) item.augusteLabel = "";
+  item.augusteMarkedAt = item.augusteStatus ? new Date().toISOString() : null;
+
+  if (detailId === id) renderAugusteSection(item);
+  render();
+  await save();
+  toast(item.augusteStatus ? (item.augusteStatus === "reservert" ? "🎁 Reservert" : "🤔 Vurderer") : "Fjernet");
+}
+
+async function setAugusteLabel(id, value) {
+  const item = data.items.find(i => i.id === id);
+  if (!item) return;
+  item.augusteLabel = value.trim();
+  await save();
 }
 
 function closeDetail() {
@@ -483,6 +541,29 @@ function renderWishlist() {
   main.innerHTML = `<div class="gallery">${items.map((it, idx) => renderCard(it, idx)).join("")}</div>`;
 }
 
+function reservedItems() {
+  return data.items.filter(i => i.augusteStatus).sort((a, b) => {
+    if (a.augusteStatus !== b.augusteStatus) return a.augusteStatus === "reservert" ? -1 : 1;
+    return new Date(b.augusteMarkedAt || 0) - new Date(a.augusteMarkedAt || 0);
+  });
+}
+function renderReserved() {
+  const items = reservedItems();
+  const main = document.getElementById("main");
+  if (!items.length) {
+    main.innerHTML = `<div class="empty"><div class="empty-icon">🎁</div><p>Ingen reservasjoner ennå.<br>Åpne en vare → 🎁 Auguste-seksjonen for å markere.</p></div>`;
+    return;
+  }
+  main.innerHTML = `<div class="gallery">${items.map((it, idx) => renderCard(it, idx)).join("")}</div>`;
+}
+function updateReservedBadge() {
+  const el = document.getElementById("nav-reserved-badge");
+  if (!el) return;
+  const n = reservedItems().length;
+  el.textContent = n;
+  el.style.display = n > 0 ? "flex" : "none";
+}
+
 function renderArchive() {
   const items = data.items.filter(i => i.status === "kjøpt");
   if (!items.length) {
@@ -542,12 +623,16 @@ function tierChip(item) {
     ? `<img src="${item.image}" alt="" loading="lazy" onerror="cardImgError(this,'${tintA}','${tintB}')">`
     : `<div class="placeholder" style="--tintA:${tintA};--tintB:${tintB}"></div>`;
   const saveBadge  = item.status === "sparer_til" ? `<span class="tier-badge tier-badge-save">💰</span>` : "";
+  const augusteBadge = item.augusteStatus
+    ? `<span class="tier-badge tier-badge-auguste" title="${item.augusteStatus === "reservert" ? "Auguste kjøper" : "Auguste vurderer"}${item.augusteLabel ? " · " + escHtml(item.augusteLabel) : ""}">${item.augusteStatus === "reservert" ? "🎁" : "🤔"}</span>`
+    : "";
   const priceHtml  = item.price_current ? `<div class="tier-chip-price">${fmt(item.price_current)}</div>` : "";
   const safeName = (item.name || item.url || "").replace(/"/g, "&quot;");
   return `<div class="tier-chip-wrap">
     <div class="tier-chip" data-id="${item.id}" title="${safeName}">
       <div class="tier-chip-imgclip">${img}</div>
       ${saveBadge}
+      ${augusteBadge}
     </div>
     ${priceHtml}
   </div>`;
@@ -860,7 +945,7 @@ function setupTierDrag() {
     tierDrag.lastY = e.clientY;
     const dx = e.clientX - tierDrag.startX, dy = e.clientY - tierDrag.startY;
     if (!tierDrag.moved) {
-      if (Math.hypot(dx, dy) < 4) return;
+      if (Math.hypot(dx, dy) < 10) return;
       tierDrag.moved = true;
       main.setPointerCapture(e.pointerId);
       const src = main.querySelector(`.tier-chip[data-id="${tierDrag.id}"]`);
@@ -932,9 +1017,11 @@ function render() {
     document.getElementById("pending-bar").innerHTML = "";
     document.getElementById("filter-bar").innerHTML = "";
     if (view === "tier") renderTier();
+    else if (view === "reserved") renderReserved();
     else renderArchive();
   }
   updateTierBadge();
+  updateReservedBadge();
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
   document.getElementById(`nav-${view}`).classList.add("active");
 }

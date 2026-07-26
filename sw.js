@@ -1,4 +1,4 @@
-const CACHE = "handleliste-v20";
+const CACHE = "handleliste-v24";
 const ASSETS = [
   "./",
   "./index.html",
@@ -23,6 +23,7 @@ self.addEventListener("activate", e => {
 });
 
 self.addEventListener("fetch", e => {
+  if (e.request.url.includes("/api/")) { e.respondWith(fetch(e.request)); return; }
   e.respondWith(
     fetch(e.request)
       .then(r => {
