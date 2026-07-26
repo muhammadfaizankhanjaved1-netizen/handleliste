@@ -390,6 +390,7 @@ function renderAugusteSection(item) {
 async function setAugusteStatus(id, status) {
   const item = data.items.find(i => i.id === id);
   if (!item) return;
+  const wasReservert = item.augusteStatus === "reservert";
   item.augusteStatus = (item.augusteStatus === status) ? null : status;
   if (!item.augusteStatus) item.augusteLabel = "";
   item.augusteMarkedAt = item.augusteStatus ? new Date().toISOString() : null;
@@ -398,6 +399,22 @@ async function setAugusteStatus(id, status) {
   render();
   await save();
   toast(item.augusteStatus ? (item.augusteStatus === "reservert" ? "🎁 Reservert" : "🤔 Vurderer") : "Fjernet");
+  if (item.augusteStatus === "reservert" && !wasReservert) showLoveNote();
+}
+
+// Vises KUN når hun garantert reserverer (ikke ved «vurderer» eller når hun fjerner en reservasjon)
+let loveNoteTimer = null;
+function showLoveNote() {
+  const el = document.getElementById("love-note-overlay");
+  if (!el) return;
+  el.classList.add("show");
+  clearTimeout(loveNoteTimer);
+  loveNoteTimer = setTimeout(closeLoveNote, 5000);
+}
+function closeLoveNote() {
+  const el = document.getElementById("love-note-overlay");
+  if (el) el.classList.remove("show");
+  clearTimeout(loveNoteTimer);
 }
 
 async function setAugusteLabel(id, value) {
