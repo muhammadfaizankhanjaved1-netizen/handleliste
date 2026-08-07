@@ -18,6 +18,10 @@ const TINTS = [
 const CURRENCY_CYCLE = ["NOK","EUR","USD","GBP","SEK","DKK"];
 const THEME_CYCLE = ["warm","skog","skifer","plomme","dark","bw","navy","oldmoney"];
 const THEME_LABELS = { warm:"Varm leire", skog:"Skog", skifer:"Kjølig skifer", plomme:"Plomme", dark:"Mørk antrasitt", bw:"Svart/hvit", navy:"Marineblå", oldmoney:"Old money" };
+// Eget temasett kun for Auguste — samme idé som Faizans, men i rosa-familien.
+// Helt separat syklus/lagring (se themeKey()) så hennes valg aldri blander seg med hans.
+const THEME_CYCLE_AUGUSTE = ["rosa","rosaMork","korall","lilla"];
+const THEME_LABELS_AUGUSTE = { rosa:"Rosa", rosaMork:"Mørk rosa", korall:"Korall", lilla:"Lilla" };
 const SORT_CYCLE = ["newest","price_desc","name","oldest"];
 const SORT_LABELS = { newest:"Nyeste", price_desc:"Pris", name:"Navn", oldest:"Gamleste" };
 const TIERS = [
@@ -27,9 +31,190 @@ const TIERS = [
   { key: "c", label: "Kan vente",                hue: 145 },
   { key: "d", label: "Lav prioritet",            hue: 255 },
 ];
+// Auguste sine egne kategorier for "Min liste" — helt uavhengig av Faizans
+// TIERS over, kun brukt til hennes private planlegging.
+const PLAN_CATEGORIES = [
+  { key: "naer",     icon: "🕐", label: "Nær tid" },
+  { key: "trenger",  icon: "🔁", label: "Trenger ofte" },
+  { key: "spesiell", icon: "🎉", label: "Spesiell dag" },
+  { key: "ide",      icon: "💡", label: "Idé/Kanskje" },
+  { key: "stort",    icon: "🐷", label: "Stort mål" },
+];
+
+// ── Bruker-modus (Faizan / Auguste) ─────────────────────────────────────────
+// ?bruker=auguste i URL-en (bokmerkes på hennes telefon) setter modus varig i
+// localStorage på DEN enheten — ingen konto, bare et lokalt flagg per enhet.
+// Auguste-modus krever i tillegg PIN (se checkPin) før noe rendres. Selve
+// bruker-VALGET er permanent (localStorage), men OPPLÅSINGEN er kun for denne
+// fanens levetid (sessionStorage) OG kobles ut med en gang fanen/appen fanes
+// bort — se visibilitychange-lytteren i boot().
+const AUGUSTE_PIN = "140224";
+const BRUKER_KEY = "hl-bruker";
+const AUGUSTE_UNLOCKED_KEY = "hl-auguste-unlocked";
+
+function resolveBruker() {
+  const params = new URLSearchParams(location.search);
+  const fromUrl = params.get("bruker");
+  if (fromUrl === "auguste" || fromUrl === "faizan") {
+    localStorage.setItem(BRUKER_KEY, fromUrl);
+    return fromUrl;
+  }
+  return localStorage.getItem(BRUKER_KEY) || "faizan";
+}
+const bruker = resolveBruker();
+const erAuguste = bruker === "auguste";
+// Temaet følger hvilken LISTE som vises (visningEier), ikke hvem enheten
+// tilhører (bruker) — å besøke den andres liste skal se ut som DERES app.
+function themeKey() { return visningEier === "auguste" ? "hl-theme-auguste" : "hl-theme"; }
+let appBooted = false;
+function augusteUnlocked() {
+  return sessionStorage.getItem(AUGUSTE_UNLOCKED_KEY) === "1";
+}
+// Full reload (ikke bare state-bytte) — enklest og tryggest måte å sikre at
+// PIN-sjekk, nav-synlighet og all erAuguste-avhengig rendering får riktig
+// utgangspunkt igjen, siden erAuguste ellers er satt én gang ved sideinnlasting.
+function switchBruker() {
+  const next = erAuguste ? "faizan" : "auguste";
+  location.href = location.pathname + "?bruker=" + next;
+}
+
+// Vis PIN-skjermen igjen uten å røre appen som allerede kjører bak den —
+// bootApp() (data/lyttere/intervaller) skal kun kjøre én gang per sideinnlasting.
+function lockApp() {
+  sessionStorage.removeItem(AUGUSTE_UNLOCKED_KEY);
+  const overlay = document.getElementById("pin-overlay");
+  if (overlay) overlay.classList.add("show");
+  const input = document.getElementById("pin-input");
+  if (input) { input.value = ""; input.focus(); }
+  const err = document.getElementById("pin-error");
+  if (err) err.textContent = "";
+}
+
+function checkPin() {
+  const input = document.getElementById("pin-input");
+  const val = (input?.value || "").trim();
+  if (val === AUGUSTE_PIN) {
+    sessionStorage.setItem(AUGUSTE_UNLOCKED_KEY, "1");
+    document.getElementById("pin-overlay").classList.remove("show");
+    if (input) input.value = "";
+    if (!appBooted) { appBooted = true; bootApp(); }
+  } else {
+    document.getElementById("pin-error").textContent = "Feil kode, prøv igjen";
+    if (input) { input.value = ""; input.focus(); }
+  }
+}
+
+// ── To separate lister (NY, 07.08.2026) ─────────────────────────────────────
+// Faizan og Auguste har hver sin egne, fullstendige ønskeliste (data.items og
+// data.augusteItems) — samme funksjoner (galleri/tier/arkiv/legg til/rediger)
+// brukes på begge, se data-proxyen lenger ned. "visningEier" er hvilken av de
+// to som faktisk vises akkurat nå, uavhengig av "bruker" (hvem enheten er).
+// Kun Faizan sin vei INN til Augustes liste er passordbeskyttet (hennes vei inn
+// til hans er fri, akkurat som Auguste-reservasjonen alltid har vært) — huskes
+// varig per enhet i localStorage (ikke sessionStorage som PIN-en over), siden
+// dette kun er for å hindre at hun tilfeldig ser det på HANS enhet, ikke en
+// reell sikkerhetssperre.
+const ANDRES_LISTE_PIN = "8215";
+const ANDRES_LISTE_UNLOCKED_KEY = "hl-andres-unlocked";
+let visningEier = bruker; // default: se sin egen liste
+
+function andreEier() { return bruker === "auguste" ? "faizan" : "auguste"; }
+function seerAndres() { return visningEier !== bruker; }
+// Hvem som EVENTUELT reserverer/vurderer på listen som vises akkurat nå —
+// kun definert når man ser på DEN ANDRES liste, null på sin egen (ingen
+// reserve-verktøy trengs der).
+function reserverRolle() { return seerAndres() ? bruker : null; }
+function reserverFeltnavn(rolle) {
+  return rolle === "faizan"
+    ? { status: "faizanStatus", label: "faizanLabel", markedAt: "faizanMarkedAt" }
+    : { status: "augusteStatus", label: "augusteLabel", markedAt: "augusteMarkedAt" };
+}
+function reserverListe() {
+  return reserverRolle() === "faizan" ? _raw.augusteItems : _raw.items;
+}
+
+function andresListeUlaast() {
+  return localStorage.getItem(ANDRES_LISTE_UNLOCKED_KEY) === "1";
+}
+
+function bytteListe() {
+  if (!seerAndres()) {
+    if (bruker === "faizan" && !andresListeUlaast()) { apneAndresPin(); return; }
+    visningEier = andreEier();
+  } else {
+    visningEier = bruker;
+  }
+  etterListeBytte();
+}
+
+function apneAndresPin() {
+  document.getElementById("andres-pin-overlay")?.classList.add("show");
+  document.getElementById("andres-pin-input")?.focus();
+}
+function lukkAndresPin() {
+  document.getElementById("andres-pin-overlay")?.classList.remove("show");
+  const input = document.getElementById("andres-pin-input");
+  if (input) input.value = "";
+  const err = document.getElementById("andres-pin-error");
+  if (err) err.textContent = "";
+}
+function sjekkAndresPin() {
+  const input = document.getElementById("andres-pin-input");
+  const val = (input?.value || "").trim();
+  if (val === ANDRES_LISTE_PIN) {
+    localStorage.setItem(ANDRES_LISTE_UNLOCKED_KEY, "1");
+    lukkAndresPin();
+    visningEier = andreEier();
+    etterListeBytte();
+  } else {
+    document.getElementById("andres-pin-error").textContent = "Feil kode, prøv igjen";
+    if (input) { input.value = ""; input.focus(); }
+  }
+}
+
+function etterListeBytte() {
+  filters = { cat: null, status: null };
+  searchQuery = "";
+  sort = "newest";
+  view = "wishlist";
+  closeDetail();
+  oppdaterTemaForVisning();
+  oppdaterBytteListeKnapp();
+  render();
+}
+
+function oppdaterBytteListeKnapp() {
+  const pill = document.getElementById("switch-list-pill");
+  const banner = document.getElementById("andres-liste-banner");
+  if (!pill) return;
+  if (seerAndres()) {
+    pill.textContent = "🔙";
+    pill.title = "Tilbake til min egen liste";
+  } else {
+    pill.textContent = "👀";
+    pill.title = andreEier() === "auguste" ? "Se Augustes liste" : "Se Faizans liste";
+  }
+  if (banner) {
+    banner.style.display = seerAndres() ? "flex" : "none";
+    banner.querySelector(".banner-txt").textContent = andreEier() === "auguste"
+      ? "Du ser Auguste sin liste"
+      : "Du ser Faizan sin liste";
+  }
+}
 
 // ── State ────────────────────────────────────────────────────────────────────
-let data = { categories: CATEGORIES, items: [] };
+// _raw holder BEGGE lister (Faizans items + Augustes augusteItems) — dette er
+// det som faktisk hentes/lagres mot /api/data. "data" er en tynn proxy foran
+// _raw: data.items peker på hvilken av de to som er aktiv (visningEier), slik
+// at all eksisterende kode i resten av filen (render, add/edit/slett,
+// tier-brett, arkiv osv.) virker uendret uansett hvilken liste som vises.
+let _raw = { categories: CATEGORIES, items: [], augusteItems: [] };
+const data = {
+  get categories() { return _raw.categories; },
+  set categories(v) { _raw.categories = v; },
+  get items() { return visningEier === "auguste" ? _raw.augusteItems : _raw.items; },
+  set items(v) { if (visningEier === "auguste") _raw.augusteItems = v; else _raw.items = v; },
+};
 let view = "wishlist";
 let filters = { cat: null, status: null };
 let sort = "newest";
@@ -50,13 +235,24 @@ const PENDING_KEY = "hl-pending-sync";
 function markPending(v) { try { localStorage.setItem(PENDING_KEY, v ? "1" : ""); } catch {} }
 function hasPending()   { try { return localStorage.getItem(PENDING_KEY) === "1"; } catch { return false; } }
 
+// Sikrer at et hentet/cachet objekt har begge lister + saved-default satt,
+// uansett hvilken (evt. begge) som faktisk skal vises akkurat nå.
+function normaliserRaw(d) {
+  d = d || {};
+  if (!Array.isArray(d.items)) d.items = [];
+  if (!Array.isArray(d.augusteItems)) d.augusteItems = [];
+  if (!d.categories) d.categories = CATEGORIES;
+  d.items.forEach(i => { if (typeof i.saved !== "number") i.saved = 0; });
+  d.augusteItems.forEach(i => { if (typeof i.saved !== "number") i.saved = 0; });
+  return d;
+}
 async function load() {
   try {
     // Endringer gjort offline? Push dem FØR fersk henting — ellers
     // ville sky-data overskrevet det som ble endret uten nett.
     if (hasPending()) {
       const cached = loadCache();
-      if (cached) data = cached;
+      if (cached) _raw = normaliserRaw(cached);
       const ok = await save();
       if (!ok) throw new Error("offline-pending");
     }
@@ -65,30 +261,26 @@ async function load() {
     const cloudData = await r.json();
     const cloudHasItems = cloudData && Array.isArray(cloudData.items) && cloudData.items.length > 0;
     if (cloudHasItems) {
-      data = cloudData;
+      _raw = normaliserRaw(cloudData);
     } else {
       // Skyen er tom (f.eks. rett etter migrering til ny lagring) — ikke
       // stol blindt på det hvis vi har ekte data lokalt. Bruk lokal kopi
       // og push den opp, i stedet for å late som om varene er borte.
       const cached = loadCache();
       if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
-        data = cached;
+        _raw = normaliserRaw(cached);
         save();
       } else {
-        data = cloudData;
+        _raw = normaliserRaw(cloudData);
       }
     }
-    if (!data.items) data.items = [];
-    data.items.forEach(i => { if (typeof i.saved !== "number") i.saved = 0; });
-    saveCache(data);
+    saveCache(_raw);
     const offlineBanner = document.getElementById("offline-banner");
     if (offlineBanner) offlineBanner.style.display = "none";
   } catch (e) {
     const cached = loadCache();
     if (cached) {
-      data = cached;
-      if (!data.items) data.items = [];
-      data.items.forEach(i => { if (typeof i.saved !== "number") i.saved = 0; });
+      _raw = normaliserRaw(cached);
       const offlineBanner = document.getElementById("offline-banner");
       if (offlineBanner) offlineBanner.style.display = "block";
     } else {
@@ -98,12 +290,12 @@ async function load() {
 }
 async function save() {
   // Lokal kopi FØRST — feiler nettet ligger endringen trygt og synkes senere
-  saveCache(data);
+  saveCache(_raw);
   try {
     const r = await fetch(`/api/data`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(_raw),
     });
     if (!r.ok) throw new Error(r.status);
     markPending(false);
@@ -196,12 +388,27 @@ function cycleCurrency() {
 
 // ── Tema ─────────────────────────────────────────────────────────────────────
 function cycleTheme() {
+  const visesSomAuguste = visningEier === "auguste";
+  const cycle  = visesSomAuguste ? THEME_CYCLE_AUGUSTE : THEME_CYCLE;
+  const labels = visesSomAuguste ? THEME_LABELS_AUGUSTE : THEME_LABELS;
   const cur = document.documentElement.getAttribute("data-theme");
-  const idx = THEME_CYCLE.indexOf(cur);
-  const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
+  const idx = cycle.indexOf(cur);
+  const next = cycle[(idx + 1) % cycle.length];
   document.documentElement.setAttribute("data-theme", next);
-  localStorage.setItem("hl-theme", next);
-  toast(THEME_LABELS[next]);
+  localStorage.setItem(themeKey(), next);
+  toast(labels[next]);
+}
+
+// Setter tema-attributtet ut fra HVILKEN LISTE som vises akkurat nå (kalles
+// ved boot og hver gang bytteListe() flipper visningEier).
+function oppdaterTemaForVisning() {
+  const visesSomAuguste = visningEier === "auguste";
+  const cycle = visesSomAuguste ? THEME_CYCLE_AUGUSTE : THEME_CYCLE;
+  const savedTheme = localStorage.getItem(themeKey());
+  const migrated = savedTheme === "light" ? "warm" : savedTheme;
+  const theme = cycle.includes(migrated) ? migrated : (visesSomAuguste ? "rosa" : "warm");
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem(themeKey(), theme);
 }
 
 // ── Format ───────────────────────────────────────────────────────────────────
@@ -288,8 +495,17 @@ function renderCard(item, index, archived = false) {
 
   const dropHtml = priceDrop(item) ? `<div class="price-drop-badge">↓</div>` : "";
 
-  const augusteHtml = item.augusteStatus
-    ? `<div class="auguste-badge auguste-badge-${item.augusteStatus}">${item.augusteStatus === "reservert" ? "🎁 Auguste kjøper" : "🤔 Auguste vurderer"}${item.augusteLabel ? " · " + escHtml(item.augusteLabel) : ""}</div>`
+  // Speilvendt begge veier: augusteStatus (hun markerer på Faizans liste) og
+  // faizanStatus (han markerer på Augustes liste) bruker samme visning. Eieren
+  // av listen som er åpen ser bare et lite nøytralt emoji-merke (ingen
+  // navn/tekst — skal ikke røpe overraskelsen); den som EVENTUELT reserverer
+  // (dvs. besøker den andres liste) ser full detalj.
+  const rStatus = visningEier === "faizan" ? item.augusteStatus : item.faizanStatus;
+  const rLabel  = visningEier === "faizan" ? item.augusteLabel  : item.faizanLabel;
+  const augusteHtml = rStatus
+    ? (seerAndres()
+        ? `<div class="auguste-badge auguste-badge-${rStatus}">${rStatus === "reservert" ? "🎁 Reservert" : "🤔 Vurderer"}${rLabel ? " · " + escHtml(rLabel) : ""}</div>`
+        : `<div class="auguste-badge-mini">${rStatus === "reservert" ? "🎁" : "🤔"}</div>`)
     : "";
 
   return `<div class="card${archived ? " card-archived" : ""}" onclick="openDetail('${item.id}')">
@@ -361,7 +577,17 @@ function openDetail(id) {
       onclick="setItemStatus('${item.id}','${s}')">${STATUS_ICONS[s]} ${STATUS_LABELS[s]}</button>`;
   }).join("");
 
-  renderAugusteSection(item);
+  // Reservasjon (gave-markering) vises når man ser på DEN ANDRES liste —
+  // fungerer nå begge veier (Auguste på Faizans liste, som før, ELLER
+  // Faizan på Augustes liste, nytt). "Min liste"-planlegging er fortsatt
+  // kun Auguste sitt verktøy (uendret, se erAuguste under).
+  const rolle = reserverRolle();
+  const augusteSection = document.getElementById("detail-auguste-section");
+  const augustePlanSection = document.getElementById("detail-augusteplan-section");
+  if (augusteSection) augusteSection.style.display = rolle ? "" : "none";
+  if (augustePlanSection) augustePlanSection.style.display = erAuguste ? "" : "none";
+  if (rolle) renderReserveSection(item);
+  if (erAuguste) renderAugustePlanSection(item);
 
   const urlBtn = document.getElementById("detail-url-btn");
   if (item.url) { urlBtn.href = item.url; urlBtn.style.display = "block"; }
@@ -370,36 +596,44 @@ function openDetail(id) {
   document.getElementById("detail-overlay").classList.add("open");
 }
 
-// ── Auguste-reservasjon (hun markerer hva hun vurderer/har bestemt seg for å kjøpe) ──
-function renderAugusteSection(item) {
+// ── Reservasjon (den som besøker den andres liste markerer hva de vurderer/
+// har bestemt seg for å kjøpe) — fungerer symmetrisk begge veier via
+// reserverRolle()/reserverFeltnavn()/reserverListe(), se lenger opp i filen. ──
+function renderReserveSection(item) {
   const row = document.getElementById("detail-auguste-row");
   if (!row) return;
-  const st = item.augusteStatus || null;
+  const felt = reserverFeltnavn(reserverRolle());
+  const st = item[felt.status] || null;
   const btn = (key, icon, label) =>
     `<button type="button" class="detail-auguste-btn${st === key ? ` active-${key}` : ""}"
-      onclick="setAugusteStatus('${item.id}','${key}')">${icon} ${label}</button>`;
+      onclick="setReserveStatus('${item.id}','${key}')">${icon} ${label}</button>`;
   let html = `<div class="detail-auguste-btns">${btn("vurderer", "🤔", "Vurderer")}${btn("reservert", "🎁", "Reserverer")}</div>`;
   if (st) {
     html += `<input type="text" class="detail-auguste-label" id="detail-auguste-label"
       placeholder="Anledning (valgfritt) – f.eks. Bursdag, Jubileum, Gave"
-      value="${escHtml(item.augusteLabel || "")}" onchange="setAugusteLabel('${item.id}', this.value)">`;
+      value="${escHtml(item[felt.label] || "")}" onchange="setReserveLabel('${item.id}', this.value)">`;
   }
   row.innerHTML = html;
 }
 
-async function setAugusteStatus(id, status) {
-  const item = data.items.find(i => i.id === id);
+async function setReserveStatus(id, status) {
+  const rolle = reserverRolle();
+  if (!rolle) return;
+  const felt = reserverFeltnavn(rolle);
+  const item = reserverListe().find(i => i.id === id);
   if (!item) return;
-  const wasReservert = item.augusteStatus === "reservert";
-  item.augusteStatus = (item.augusteStatus === status) ? null : status;
-  if (!item.augusteStatus) item.augusteLabel = "";
-  item.augusteMarkedAt = item.augusteStatus ? new Date().toISOString() : null;
+  const wasReservert = item[felt.status] === "reservert";
+  item[felt.status] = (item[felt.status] === status) ? null : status;
+  if (!item[felt.status]) item[felt.label] = "";
+  item[felt.markedAt] = item[felt.status] ? new Date().toISOString() : null;
 
-  if (detailId === id) renderAugusteSection(item);
+  if (detailId === id) renderReserveSection(item);
   render();
   await save();
-  toast(item.augusteStatus ? (item.augusteStatus === "reservert" ? "🎁 Reservert" : "🤔 Vurderer") : "Fjernet");
-  if (item.augusteStatus === "reservert" && !wasReservert) showLoveNote();
+  toast(item[felt.status] ? (item[felt.status] === "reservert" ? "🎁 Reservert" : "🤔 Vurderer") : "Fjernet");
+  // Kjærlighetsbeskjeden er fra Faizan til Auguste — vises kun når HUN
+  // reserverer noe på HANS liste, ikke omvendt (ingen speilbeskjed skrevet).
+  if (rolle === "auguste" && item[felt.status] === "reservert" && !wasReservert) showLoveNote();
 }
 
 // Vises KUN når hun garantert reserverer (ikke ved «vurderer» eller når hun fjerner en reservasjon)
@@ -417,11 +651,62 @@ function closeLoveNote() {
   clearTimeout(loveNoteTimer);
 }
 
-async function setAugusteLabel(id, value) {
-  const item = data.items.find(i => i.id === id);
+async function setReserveLabel(id, value) {
+  const rolle = reserverRolle();
+  if (!rolle) return;
+  const felt = reserverFeltnavn(rolle);
+  const item = reserverListe().find(i => i.id === id);
   if (!item) return;
-  item.augusteLabel = value.trim();
+  item[felt.label] = value.trim();
   await save();
+}
+
+// ── Auguste sin egen liste (velger blant Faizans varer, endrer aldri hans
+// egen tier/status) — rent privat lag kun hun ser og bruker ──────────────────
+function renderAugustePlanSection(item) {
+  const row = document.getElementById("detail-plan-row");
+  if (!row) return;
+  const p = item.augustePlan || null;
+  const btns = PLAN_CATEGORIES.map(c =>
+    `<button type="button" class="detail-plan-btn${p === c.key ? " active" : ""}"
+      onclick="setAugustePlan('${item.id}','${c.key}')">${c.icon} ${c.label}</button>`
+  ).join("");
+  row.innerHTML = `<div class="detail-plan-btns">${btns}</div>`;
+}
+
+// "Min liste" er alltid Augustes planlegging av gaveidéer FRA FAIZANS liste —
+// leser/skriver derfor bevisst _raw.items direkte (ikke den bytte-avhengige
+// data.items), uendret uansett hvilken liste hun måtte stå og se på.
+async function setAugustePlan(id, plan) {
+  const item = _raw.items.find(i => i.id === id);
+  if (!item) return;
+  item.augustePlan = (item.augustePlan === plan) ? null : plan;
+
+  if (detailId === id) renderAugustePlanSection(item);
+  if (view === "mitt") render();
+  await save();
+  toast(item.augustePlan ? "Lagt til i min liste" : "Fjernet fra min liste");
+}
+
+function minListeItems() {
+  return _raw.items.filter(i => i.augustePlan && i.status !== "kjøpt" && i.status !== "pending");
+}
+function renderMinListe() {
+  const items = minListeItems();
+  const main = document.getElementById("main");
+  if (!items.length) {
+    main.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><p>Ingenting i din liste ennå.<br>Åpne en vare → 📋 Min liste for å legge til.</p></div>`;
+    return;
+  }
+  const section = (c) => {
+    const list = items.filter(i => i.augustePlan === c.key);
+    if (!list.length) return "";
+    return `<div class="mitt-section">
+      <div class="mitt-section-label">${c.icon} ${c.label} <span class="tier-col-count">${list.length}</span></div>
+      <div class="gallery">${list.map((it, idx) => renderCard(it, idx)).join("")}</div>
+    </div>`;
+  };
+  main.innerHTML = PLAN_CATEGORIES.map(section).join("");
 }
 
 function closeDetail() {
@@ -558,8 +843,10 @@ function renderWishlist() {
   main.innerHTML = `<div class="gallery">${items.map((it, idx) => renderCard(it, idx)).join("")}</div>`;
 }
 
+// Samme prinsipp som Min liste over — "Reservert"-fanen er alltid Augustes
+// reservasjoner PÅ FAIZANS liste, leser derfor bevisst _raw.items direkte.
 function reservedItems() {
-  return data.items.filter(i => i.augusteStatus).sort((a, b) => {
+  return _raw.items.filter(i => i.augusteStatus).sort((a, b) => {
     if (a.augusteStatus !== b.augusteStatus) return a.augusteStatus === "reservert" ? -1 : 1;
     return new Date(b.augusteMarkedAt || 0) - new Date(a.augusteMarkedAt || 0);
   });
@@ -640,8 +927,13 @@ function tierChip(item) {
     ? `<img src="${item.image}" alt="" loading="lazy" onerror="cardImgError(this,'${tintA}','${tintB}')">`
     : `<div class="placeholder" style="--tintA:${tintA};--tintB:${tintB}"></div>`;
   const saveBadge  = item.status === "sparer_til" ? `<span class="tier-badge tier-badge-save">💰</span>` : "";
-  const augusteBadge = item.augusteStatus
-    ? `<span class="tier-badge tier-badge-auguste" title="${item.augusteStatus === "reservert" ? "Auguste kjøper" : "Auguste vurderer"}${item.augusteLabel ? " · " + escHtml(item.augusteLabel) : ""}">${item.augusteStatus === "reservert" ? "🎁" : "🤔"}</span>`
+  const rStatus = visningEier === "faizan" ? item.augusteStatus : item.faizanStatus;
+  const rLabel  = visningEier === "faizan" ? item.augusteLabel  : item.faizanLabel;
+  const augusteTitle = seerAndres()
+    ? `${rStatus === "reservert" ? "Reservert" : "Vurderer"}${rLabel ? " · " + escHtml(rLabel) : ""}`
+    : (rStatus === "reservert" ? "Reservert" : "Vurderes");
+  const augusteBadge = rStatus
+    ? `<span class="tier-badge tier-badge-auguste" title="${augusteTitle}">${rStatus === "reservert" ? "🎁" : "🤔"}</span>`
     : "";
   const priceHtml  = item.price_current ? `<div class="tier-chip-price">${fmt(item.price_current)}</div>` : "";
   const safeName = (item.name || item.url || "").replace(/"/g, "&quot;");
@@ -1035,6 +1327,7 @@ function render() {
     document.getElementById("filter-bar").innerHTML = "";
     if (view === "tier") renderTier();
     else if (view === "reserved") renderReserved();
+    else if (view === "mitt") renderMinListe();
     else renderArchive();
   }
   updateTierBadge();
@@ -1043,6 +1336,9 @@ function render() {
   document.getElementById(`nav-${view}`).classList.add("active");
 }
 function setView(v) {
+  // "reserved" og "mitt" er Auguste-eksklusive faner — knappene er allerede
+  // fjernet fra DOM-en for Faizan, men vernes her også i tilfelle stale state.
+  if (!erAuguste && (v === "reserved" || v === "mitt")) return;
   view = v;
   if (v === "tier") cardSorterDismissed = false;
   render();
@@ -1501,15 +1797,23 @@ async function refreshData() {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-async function boot() {
+async function bootApp() {
   window.scrollTo(0, 0);
-  const savedTheme = localStorage.getItem("hl-theme");
-  const migrated = savedTheme === "light" ? "warm" : savedTheme;
-  const theme = THEME_CYCLE.includes(migrated) ? migrated : "warm";
-  document.documentElement.setAttribute("data-theme", theme);
-  localStorage.setItem("hl-theme", theme);
+  oppdaterTemaForVisning();
 
   document.getElementById("currency-pill").textContent = (displayCurrency === "NOK" ? "kr" : displayCurrency) + " ▾";
+
+  // Auguste-eksklusive nav-faner skjules helt for Faizan (ikke bare tomme —
+  // finnes ikke som klikkbare knapper i det hele tatt på hans enhet). Dette
+  // er uendret og styrer seg fortsatt på HVEM ENHETEN ER (erAuguste), ikke
+  // hvilken liste som vises — samme "Min liste"-verktøy som før.
+  const navReserved = document.getElementById("nav-reserved");
+  const navMitt = document.getElementById("nav-mitt");
+  if (navReserved) navReserved.style.display = erAuguste ? "" : "none";
+  if (navMitt) navMitt.style.display = erAuguste ? "" : "none";
+  const switchPill = document.getElementById("switch-user-pill");
+  if (switchPill) switchPill.title = erAuguste ? "Bytt til Faizan" : "Bytt til Auguste";
+  oppdaterBytteListeKnapp();
 
   document.getElementById("add-input").addEventListener("keydown", e => { if (e.key === "Enter") handleAdd(); });
   document.getElementById("spar-input").addEventListener("input", updateSparConfirmLabel);
@@ -1529,6 +1833,35 @@ async function boot() {
   window.scrollTo(0, 0);
   handleSharedUrl();
   startAutoRefresh();
+}
+
+// Auguste-modus krever korrekt PIN på DENNE enheten før noe som helst av
+// appen bygges/rendres — resten av oppstarten venter på checkPin(). Enter-
+// lytteren må festes HER (ikke i bootApp) siden bootApp aldri kjører før PIN-en er riktig.
+// PIN-en er kun gyldig for fanens levetid: forlater hun fanen/appen (bakgrunn,
+// bytter app, låser telefon) fjernes opplåsingen med en gang via visibilitychange —
+// neste gang hun kommer tilbake må hun taste koden på nytt, uansett hvor kort tid det var.
+function boot() {
+  if (erAuguste) {
+    // Festes uansett låst/ulåst status ved denne sideinnlastingen — ellers
+    // mangler Enter-støtte hvis hun først laster siden ulåst og blir relåst
+    // senere via visibilitychange (lockApp viser da overlayen uten ny boot()).
+    document.getElementById("pin-input")?.addEventListener("keydown", e => { if (e.key === "Enter") checkPin(); });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        sessionStorage.removeItem(AUGUSTE_UNLOCKED_KEY);
+      } else if (!augusteUnlocked()) {
+        lockApp();
+      }
+    });
+  }
+  if (erAuguste && !augusteUnlocked()) {
+    document.getElementById("pin-overlay").classList.add("show");
+    document.getElementById("pin-input")?.focus();
+    return;
+  }
+  appBooted = true;
+  bootApp();
 }
 
 document.addEventListener("DOMContentLoaded", boot);

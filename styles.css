@@ -51,6 +51,32 @@
   --save: #B08D3C; --saveInk: #8A6E2E; --saveTrack: #E6DEC9;
 }
 
+/* ── Auguste-eksklusive temaer (rosa-familien) ── */
+[data-theme="rosa"] {
+  --bg: #F7E9EE; --screen: #FDF3F6; --card: #FFFFFF; --sheet: #FFF6F9;
+  --frame: #F0D9E1; --frameBorder: #E6C3D0; --ink: #3A1F2A; --muted: #8C6575;
+  --faint: #C79AAE; --line: #F2DCE5; --chipInk: #7A4F60; --accent: #D6689A;
+  --save: #CDA24E; --saveInk: #9A7B3E; --saveTrack: #F5E3EB;
+}
+[data-theme="rosaMork"] {
+  --bg: #2A1620; --screen: #331C28; --card: #3D2230; --sheet: #38202C;
+  --frame: #24121B; --frameBorder: #3D2230; --ink: #F5E3EC; --muted: #C79AAE;
+  --faint: #A5738A; --line: #4A2A3A; --chipInk: #EBC9D8; --accent: #E56FA0;
+  --save: #D9AE5A; --saveInk: #D9AE5A; --saveTrack: #4A2A3A;
+}
+[data-theme="korall"] {
+  --bg: #FBEAE3; --screen: #FEF4EF; --card: #FFFFFF; --sheet: #FEF1EA;
+  --frame: #F5D9CB; --frameBorder: #EBC1AC; --ink: #3A241A; --muted: #93685A;
+  --faint: #CBA192; --line: #F5DCD1; --chipInk: #7A4E3E; --accent: #E8825F;
+  --save: #CDA24E; --saveInk: #9A7B3E; --saveTrack: #F7E5DB;
+}
+[data-theme="lilla"] {
+  --bg: #EFE7F2; --screen: #F8F3FA; --card: #FFFFFF; --sheet: #F6F0F9;
+  --frame: #E0D0E6; --frameBorder: #D0B9DB; --ink: #2A1E33; --muted: #7C6786;
+  --faint: #B39CBF; --line: #E6DAEC; --chipInk: #5E4A69; --accent: #9B6FB0;
+  --save: #CDA24E; --saveInk: #9A7B3E; --saveTrack: #EFE3F2;
+}
+
 :root {
   --accentD: color-mix(in srgb, var(--accent) 84%, black);
   --accentSoft: color-mix(in srgb, var(--accent) 14%, var(--card));
@@ -126,6 +152,13 @@ body {
 .btn-icon:hover { background: var(--accentD); }
 
 /* totals bar */
+.andres-liste-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  background: oklch(0.6 0.18 340 / 0.14); border: 1px solid oklch(0.6 0.18 340 / 0.35);
+  border-radius: 10px; padding: 8px 12px; margin-bottom: 10px;
+  font-size: .74rem; font-weight: 600; color: oklch(0.4 0.15 340); cursor: pointer;
+}
+.andres-liste-banner .banner-back { font-weight: 500; opacity: .8; }
 .totals-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: none; }
 .totals-bar::-webkit-scrollbar { display: none; }
 .total-chip {
@@ -287,6 +320,11 @@ body {
 }
 .auguste-badge-reservert { background: oklch(0.6 0.18 340); color: #fff; }
 .auguste-badge-vurderer  { background: oklch(0.88 0.08 340); color: oklch(0.35 0.12 340); }
+/* Faizan ser aldri navn/tekst her — kun et lite nøytralt emoji-merke. */
+.auguste-badge-mini {
+  display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center;
+  font-size: .8rem; background: rgba(255,255,255,0.92); border-radius: 999px; margin-bottom: 6px;
+}
 
 .card-body { padding: 12px 13px 14px; }
 .card-name { font-size: .88rem; font-weight: 600; color: var(--ink); line-height: 1.25; margin-bottom: 3px; }
@@ -438,6 +476,18 @@ body {
   border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: .82rem;
   box-sizing: border-box;
 }
+
+.detail-plan-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+.detail-plan-btn {
+  font-size: .78rem; font-weight: 600; padding: 9px 4px; text-align: center;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  cursor: pointer; transition: background .15s, border-color .15s;
+}
+.detail-plan-btn:active { transform: scale(.96); }
+.detail-plan-btn.active { background: var(--accent); border-color: var(--accent); color: var(--onAccent); }
+/* Femte knapp (oddetall) får egen rad — spenn den over begge kolonner i stedet
+   for å la den henge alene til venstre. */
+.detail-plan-btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .detail-footer { display: flex; flex-direction: column; gap: 10px; }
 .detail-url-btn {
   display: block; text-align: center; background: var(--card); border: 1px solid var(--line);
@@ -650,6 +700,30 @@ body {
   min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
   background: var(--danger); color: #fff; font-size: .6rem; font-weight: 700;
   display: none; align-items: center; justify-content: center; z-index: 1;
+}
+
+/* ── PIN-LÅS (Auguste-modus, per enhet) ── */
+.pin-overlay {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: var(--screen); align-items: center; justify-content: center; padding: 24px;
+}
+.pin-overlay.show { display: flex; }
+.pin-card { width: 100%; max-width: 300px; text-align: center; }
+.pin-icon { font-size: 2.4rem; margin-bottom: 10px; }
+.pin-title { font-family: "Newsreader", serif; font-size: 1.2rem; color: var(--ink); margin-bottom: 18px; }
+.pin-input {
+  width: 100%; box-sizing: border-box; text-align: center; letter-spacing: .4em;
+  font-size: 1.1rem; background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px; color: var(--ink); outline: none; margin-bottom: 12px;
+}
+.pin-input:focus { border-color: var(--accentBorder); }
+.pin-error { min-height: 18px; font-size: .78rem; color: var(--danger); margin-top: 10px; }
+
+/* ── MIN LISTE (Auguste sitt eget lag oppå Faizans varer) ── */
+.mitt-section { margin-bottom: 22px; }
+.mitt-section-label {
+  font-size: .82rem; font-weight: 700; color: var(--ink); padding: 0 16px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
 }
 
 /* ── KJÆRLIGHETSBESKJED (vises ved garantert reservasjon) ── */

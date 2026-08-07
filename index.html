@@ -27,10 +27,16 @@
       <button class="currency-pill" id="currency-pill" onclick="cycleCurrency()">kr ▾</button>
       <button class="theme-pill" id="theme-pill" onclick="cycleTheme()" title="Bytt tema">🎨</button>
       <button class="theme-pill" id="bubble-pill" onclick="openBubbles()" title="Grupper etter kategori">🫧</button>
+      <button class="theme-pill" id="switch-user-pill" onclick="switchBruker()" title="Bytt enhetens eier">🔄</button>
+      <button class="theme-pill" id="switch-list-pill" onclick="bytteListe()" title="Se den andres liste">👀</button>
       <button class="btn-icon" onclick="openAdd()" title="Ny vare">+</button>
     </div>
   </div>
   <div class="totals-bar" id="totals-bar"></div>
+  <div class="andres-liste-banner" id="andres-liste-banner" style="display:none" onclick="bytteListe()">
+    <span class="banner-txt">Du ser Auguste sin liste</span>
+    <span class="banner-back">← tilbake til min</span>
+  </div>
 </div>
 
 <!-- ── Add bar (lim inn lenke) ── -->
@@ -77,8 +83,14 @@
       <div class="detail-notes" id="detail-notes"></div>
       <div class="detail-section-label">Status</div>
       <div class="detail-status-row" id="detail-status-row"></div>
-      <div class="detail-section-label">🎁 Auguste</div>
-      <div class="detail-auguste-row" id="detail-auguste-row"></div>
+      <div id="detail-auguste-section">
+        <div class="detail-section-label">🎁 Reservasjon</div>
+        <div class="detail-auguste-row" id="detail-auguste-row"></div>
+      </div>
+      <div id="detail-augusteplan-section">
+        <div class="detail-section-label">📋 Min liste</div>
+        <div class="detail-plan-row" id="detail-plan-row"></div>
+      </div>
       <div class="detail-footer">
         <a class="detail-url-btn" id="detail-url-btn" href="" target="_blank" rel="noopener">Åpne nettbutikk ↗</a>
         <div class="detail-actions">
@@ -182,6 +194,32 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
+<!-- ── PIN-lås (kun Auguste-modus, per enhet) ── -->
+<div class="pin-overlay" id="pin-overlay">
+  <div class="pin-card">
+    <div class="pin-icon">🔒</div>
+    <div class="pin-title">Skriv inn koden</div>
+    <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+           id="pin-input" class="pin-input" autocomplete="off">
+    <button type="button" class="btn-primary" onclick="checkPin()">Lås opp</button>
+    <div class="pin-error" id="pin-error"></div>
+  </div>
+</div>
+
+<!-- ── PIN-lås (Faizan sin vei inn til Augustes liste, husket per enhet) ── -->
+<div class="pin-overlay" id="andres-pin-overlay" onclick="if(event.target===this)lukkAndresPin()">
+  <div class="pin-card">
+    <div class="pin-icon">🎁</div>
+    <div class="pin-title">Kode for å se Augustes liste</div>
+    <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8"
+           id="andres-pin-input" class="pin-input" autocomplete="off"
+           onkeydown="if(event.key==='Enter')sjekkAndresPin()">
+    <button type="button" class="btn-primary" onclick="sjekkAndresPin()">Lås opp</button>
+    <button type="button" class="btn-secondary" onclick="lukkAndresPin()" style="margin-top:8px">Avbryt</button>
+    <div class="pin-error" id="andres-pin-error"></div>
+  </div>
+</div>
+
 <!-- ── Kjærlighetsbeskjed (vises til Auguste når hun garantert reserverer noe) ── -->
 <div class="love-note-overlay" id="love-note-overlay" onclick="closeLoveNote()">
   <div class="love-note-card">
@@ -216,6 +254,13 @@
             d="M12 8v13M12 8a2.5 2.5 0 10-2.5-2.5c0 1 .7 2.5 2.5 2.5zm0 0a2.5 2.5 0 102.5-2.5c0 1-.7 2.5-2.5 2.5zM5 8h14a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1V9a1 1 0 011-1zm1 5v7a2 2 0 002 2h8a2 2 0 002-2v-7"/>
     </svg>
     Reservert
+  </button>
+  <button class="nav-btn" id="nav-mitt" onclick="setView('mitt')">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    Mitt
   </button>
   <button class="nav-btn" id="nav-archive" onclick="setView('archive')">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
