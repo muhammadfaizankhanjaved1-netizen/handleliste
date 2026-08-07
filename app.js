@@ -114,7 +114,7 @@ function checkPin() {
 // varig per enhet i localStorage (ikke sessionStorage som PIN-en over), siden
 // dette kun er for å hindre at hun tilfeldig ser det på HANS enhet, ikke en
 // reell sikkerhetssperre.
-const ANDRES_LISTE_PIN = "8215";
+const ANDRES_LISTE_PIN = "140224";
 const ANDRES_LISTE_UNLOCKED_KEY = "hl-andres-unlocked";
 let visningEier = bruker; // default: se sin egen liste
 
@@ -183,6 +183,8 @@ function etterListeBytte() {
   render();
 }
 
+// Nevner bevisst ALDRI navn her (verken i knapp-tittel eller banner) — skal
+// ikke røpe for noen som ser på skjermen at det finnes en "andre liste".
 function oppdaterBytteListeKnapp() {
   const pill = document.getElementById("switch-list-pill");
   const banner = document.getElementById("andres-liste-banner");
@@ -192,13 +194,11 @@ function oppdaterBytteListeKnapp() {
     pill.title = "Tilbake til min egen liste";
   } else {
     pill.textContent = "👀";
-    pill.title = andreEier() === "auguste" ? "Se Augustes liste" : "Se Faizans liste";
+    pill.title = "Se den andre listen";
   }
   if (banner) {
     banner.style.display = seerAndres() ? "flex" : "none";
-    banner.querySelector(".banner-txt").textContent = andreEier() === "auguste"
-      ? "Du ser Auguste sin liste"
-      : "Du ser Faizan sin liste";
+    banner.querySelector(".banner-txt").textContent = "Du ser den andre listen";
   }
 }
 
