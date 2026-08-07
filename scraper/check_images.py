@@ -53,6 +53,7 @@ def check(url, is_clothing=False):
 def main():
     data = client.read()
     items = [i for i in data["items"] if i.get("status") != "kjøpt"]
+    items += [i for i in data.get("augusteItems", []) if i.get("status") != "kjøpt"]
     problems = []
     missing = []
     for it in items:

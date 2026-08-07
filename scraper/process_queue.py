@@ -23,7 +23,10 @@ def main():
     except Exception as e:
         LOG(f"JSONBin utilgjengelig: {e}")
         return
+    # Dekker begge lister (Faizans items + Augustes augusteItems) — samme
+    # dict-referanser muteres direkte, client.write(data) lagrer hele objektet.
     pending = [i for i in data["items"] if i.get("status") == "pending"]
+    pending += [i for i in data.get("augusteItems", []) if i.get("status") == "pending"]
 
     if not pending:
         LOG("Ingen ventende varer.")

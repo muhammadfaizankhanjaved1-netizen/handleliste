@@ -19,8 +19,12 @@ LOG = lambda msg: print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=
 def main():
     LOG("Leser wishlist fra JSONBin...")
     data = client.read()
+    # Dekker begge lister (Faizans items + Augustes augusteItems) — samme
+    # dict-referanser muteres direkte, client.write(data) lagrer hele objektet.
     active = [i for i in data["items"]
               if i.get("status") not in ("kjøpt", "pending") and i.get("url")]
+    active += [i for i in data.get("augusteItems", [])
+               if i.get("status") not in ("kjøpt", "pending") and i.get("url")]
 
     if not active:
         LOG("Ingen aktive varer å oppdatere.")
