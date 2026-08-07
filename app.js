@@ -70,13 +70,6 @@ let appBooted = false;
 function augusteUnlocked() {
   return sessionStorage.getItem(AUGUSTE_UNLOCKED_KEY) === "1";
 }
-// Full reload (ikke bare state-bytte) — enklest og tryggest måte å sikre at
-// PIN-sjekk, nav-synlighet og all erAuguste-avhengig rendering får riktig
-// utgangspunkt igjen, siden erAuguste ellers er satt én gang ved sideinnlasting.
-function switchBruker() {
-  const next = erAuguste ? "faizan" : "auguste";
-  location.href = location.pathname + "?bruker=" + next;
-}
 
 // Vis PIN-skjermen igjen uten å røre appen som allerede kjører bak den —
 // bootApp() (data/lyttere/intervaller) skal kun kjøre én gang per sideinnlasting.
@@ -1811,8 +1804,6 @@ async function bootApp() {
   const navMitt = document.getElementById("nav-mitt");
   if (navReserved) navReserved.style.display = erAuguste ? "" : "none";
   if (navMitt) navMitt.style.display = erAuguste ? "" : "none";
-  const switchPill = document.getElementById("switch-user-pill");
-  if (switchPill) switchPill.title = erAuguste ? "Bytt til Faizan" : "Bytt til Auguste";
   oppdaterBytteListeKnapp();
 
   document.getElementById("add-input").addEventListener("keydown", e => { if (e.key === "Enter") handleAdd(); });
