@@ -1219,9 +1219,9 @@ function setupTierDrag() {
     // og du ender med å markere tekst i stedet for å dra boblen.
     e.preventDefault();
 
-    // Andre trykk på samme boble innen 350ms, etter et rent (ikke-dragget)
+    // Andre trykk på samme boble innen 450ms, etter et rent (ikke-dragget)
     // første trykk → åpne produktet i stedet for å starte en ny drag.
-    if (lastTierTap.id === chip.dataset.id && Date.now() - lastTierTap.time < 350) {
+    if (lastTierTap.id === chip.dataset.id && Date.now() - lastTierTap.time < 450) {
       lastTierTap = { id: null, time: 0 };
       openCardLink(chip.dataset.id);
       return;
@@ -1247,7 +1247,11 @@ function setupTierDrag() {
     tierDrag.lastY = e.clientY;
     const dx = e.clientX - tierDrag.startX, dy = e.clientY - tierDrag.startY;
     if (!tierDrag.moved) {
-      if (Math.hypot(dx, dy) < 10) return;
+      // 18px (ikke 10px) — en finger på en 56px berøringsflate jitrer mer enn
+      // en mus, en for streng terskel her gjorde at rene trykk stille ble
+      // feiltolket som en (mislykket) drag, og dobbelttrykk-gjenkjenningen
+      // (lastTierTap over) fikk aldri en ren første-tap å matche mot.
+      if (Math.hypot(dx, dy) < 18) return;
       tierDrag.moved = true;
       main.setPointerCapture(e.pointerId);
       const src = main.querySelector(`.tier-chip[data-id="${tierDrag.id}"]`);
