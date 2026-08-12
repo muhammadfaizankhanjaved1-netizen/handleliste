@@ -1,4 +1,4 @@
-const CACHE = "handleliste-v31";
+const CACHE = "handleliste-v32";
 const ASSETS = [
   "./",
   "./index.html",

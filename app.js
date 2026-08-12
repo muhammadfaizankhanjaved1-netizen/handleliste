@@ -246,6 +246,24 @@ function normaliserRaw(d) {
   d.augusteItems.forEach(i => { if (typeof i.saved !== "number") i.saved = 0; });
   return d;
 }
+// Cloudflare sin edge-routing kan gi kortvarig 404 på /api/data rett etter en
+// deploy (opptil et halvt minutt er vanlig) selv om koden bak alltid ville
+// svart riktig. Et par raske forsøk her fanger opp akkurat den kinken uten at
+// brukeren noen gang ser "frakoblet" for noe som løser seg selv om et par sek.
+async function fetchDataWithRetry(attempts = 3, delaysMs = [1500, 3000]) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const r = await fetch(`/api/data`, { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      return await r.json();
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) await new Promise(res => setTimeout(res, delaysMs[i] || 3000));
+    }
+  }
+  throw lastErr;
+}
 async function load() {
   try {
     // Endringer gjort offline? Push dem FØR fersk henting — ellers
@@ -256,9 +274,7 @@ async function load() {
       const ok = await save();
       if (!ok) throw new Error("offline-pending");
     }
-    const r = await fetch(`/api/data`, { cache: "no-store" });
-    if (!r.ok) throw new Error(r.status);
-    const cloudData = await r.json();
+    const cloudData = await fetchDataWithRetry();
     const cloudHasItems = cloudData && Array.isArray(cloudData.items) && cloudData.items.length > 0;
     if (cloudHasItems) {
       _raw = normaliserRaw(cloudData);
