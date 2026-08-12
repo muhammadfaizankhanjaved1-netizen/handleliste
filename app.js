@@ -228,6 +228,13 @@ const PENDING_KEY = "hl-pending-sync";
 function markPending(v) { try { localStorage.setItem(PENDING_KEY, v ? "1" : ""); } catch {} }
 function hasPending()   { try { return localStorage.getItem(PENDING_KEY) === "1"; } catch { return false; } }
 
+// Cloudflare KV kan ta opptil ~60 sek å replikere en skriving globalt. Uten denne
+// sperren kunne en periodisk auto-oppdatering (startAutoRefresh) hente en fortsatt-
+// gammel KV-lesning rett etter f.eks. et tier-drag og overskrive den ferske lokale
+// endringen — sett synes å "hoppe tilbake til original plass" uten at brukeren rørte noe.
+let lastLocalWriteAt = 0;
+const KV_PROPAGATION_GUARD_MS = 90 * 1000;
+
 // Sikrer at et hentet/cachet objekt har begge lister + saved-default satt,
 // uansett hvilken (evt. begge) som faktisk skal vises akkurat nå.
 function normaliserRaw(d) {
@@ -282,6 +289,7 @@ async function load() {
   }
 }
 async function save() {
+  lastLocalWriteAt = Date.now();
   // Lokal kopi FØRST — feiler nettet ligger endringen trygt og synkes senere
   saveCache(_raw);
   try {
@@ -1236,7 +1244,7 @@ function setupTierDrag() {
     tierDrag.lastY = e.clientY;
     const dx = e.clientX - tierDrag.startX, dy = e.clientY - tierDrag.startY;
     if (!tierDrag.moved) {
-      if (Math.hypot(dx, dy) < 18) return;
+  if (Math.hypot(dx, dy) < 18) return;
       tierDrag.moved = true;
       main.setPointerCapture(e.pointerId);
       const src = main.querySelector(`.tier-chip[data-id="${tierDrag.id}"]`);
@@ -1770,6 +1778,9 @@ function handleSharedUrl() {
 // ── Auto-refresh ──────────────────────────────────────────────────────────────
 function startAutoRefresh() {
   setInterval(async () => {
+    // Ikke overskriv en endring brukeren nettopp gjorde (drag, edit, status osv.)
+    // med en KV-lesning som kanskje ikke har rukket å replikere ennå.
+    if (Date.now() - lastLocalWriteAt < KV_PROPAGATION_GUARD_MS) return;
     await load();
     render();
   }, 2 * 60 * 1000);
