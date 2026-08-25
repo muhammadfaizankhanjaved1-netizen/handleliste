@@ -28,11 +28,17 @@ def main():
     pending = [i for i in data["items"] if i.get("status") == "pending"]
     pending += [i for i in data.get("augusteItems", []) if i.get("status") == "pending"]
 
-    if not pending:
+    # Varer lagt til med manuelt navn hopper over full pending-behandling (for å
+    # ikke overskrive navnet brukeren selv skrev), men mangler ofte bilde/pris —
+    # disse merkes needsImage:true av app.js og fylles inn her uten å røre navnet.
+    needs_image = [i for i in data["items"] if i.get("needsImage") and not i.get("image")]
+    needs_image += [i for i in data.get("augusteItems", []) if i.get("needsImage") and not i.get("image")]
+
+    if not pending and not needs_image:
         LOG("Ingen ventende varer.")
         return
 
-    LOG(f"{len(pending)} ventende vare(r) funnet.")
+    LOG(f"{len(pending)} ventende vare(r), {len(needs_image)} vare(r) som mangler bilde.")
     changed = False
 
     for item in pending:
@@ -60,6 +66,32 @@ def main():
             item["last_error"] = str(e)
             LOG(f"  FEIL: {e}")
             changed = True  # save error state too
+
+    for item in needs_image:
+        url = item.get("url", "")
+        LOG(f"Henter bilde: {url[:60]}...")
+        try:
+            result = scrape(url)
+            if result["image"]:
+                item["image"] = result["image"]
+                item["needsImage"] = False
+                if not item.get("price_current") and result["price_current"]:
+                    now = datetime.now(timezone.utc).isoformat()
+                    item["price_current"] = result["price_current"]
+                    item["currency"] = result.get("currency", "NOK")
+                    item.setdefault("price_history", []).append(
+                        {"date": now[:10], "price": result["price_current"]})
+                if not item.get("categories"):
+                    item["categories"] = result["categories"]
+                LOG(f"  OK: bilde funnet for {item.get('name')!r}")
+            else:
+                LOG(f"  Fortsatt ikke noe bilde for {item.get('name')!r} (prøver igjen neste kjøring)")
+            item["last_error"] = result.get("error")
+            changed = True
+        except Exception as e:
+            item["last_error"] = str(e)
+            LOG(f"  FEIL: {e}")
+            changed = True
 
     if changed:
         LOG("Lagrer til JSONBin...")

@@ -1571,6 +1571,7 @@ async function addItem(url) {
     status: manualName ? "ser_på" : "pending",
     name:   manualName || null,
     image:  null,
+    needsImage: !!manualName,
     price_current: manualPrice,
     price_history: manualPrice ? [{ date: now.slice(0,10), price: manualPrice }] : [],
     currency: "NOK", saved: 0, tier: null,
@@ -1694,6 +1695,11 @@ function closeModal() {
   editId = null;
 }
 
+function looksLikeImageUrl(u) {
+  const clean = u.split("?")[0].split("#")[0];
+  return /\.(jpe?g|png|webp|gif|avif)$/i.test(clean);
+}
+
 async function saveEdit() {
   const name  = document.getElementById("edit-name").value.trim();
   const url   = document.getElementById("edit-url").value.trim();
@@ -1705,6 +1711,9 @@ async function saveEdit() {
   const newPrice = rawPrice ? (cur === "NOK" ? Math.round(rawPrice) : toNok(rawPrice, cur)) : null;
   const cats  = allCategories().filter(c => document.getElementById("cb-" + c)?.checked);
   const imgVal = document.getElementById("edit-image").value.trim();
+  if (imgVal && !looksLikeImageUrl(imgVal)) {
+    toast("Det ser ikke ut som en direkte bildelenke (høyreklikk bildet → «Kopier bildeadresse») — bildet ble ikke lagret", true);
+  }
 
   if (editId == null) {
     if (!name && !url) { closeModal(); return; }
@@ -1714,7 +1723,7 @@ async function saveEdit() {
       id: uuid(), url: url || "",
       status: url && !name ? "pending" : status,
       name: name || null,
-      image: imgVal && imgVal.startsWith("http") ? imgVal : null,
+      image: imgVal && looksLikeImageUrl(imgVal) ? imgVal : null,
       price_current: newPrice,
       price_history: newPrice ? [{ date: now.slice(0,10), price: newPrice }] : [],
       currency: "NOK", saved: 0, tier: null,
@@ -1739,7 +1748,7 @@ async function saveEdit() {
   item.url    = url;
   item.notes  = notes;
   item.status = status;
-  if (imgVal && imgVal.startsWith("http")) item.image = imgVal;
+  if (imgVal && looksLikeImageUrl(imgVal)) item.image = imgVal;
   else if (!imgVal) item.image = null;
   if (newPrice && newPrice !== item.price_current) {
     item.price_current = newPrice;
