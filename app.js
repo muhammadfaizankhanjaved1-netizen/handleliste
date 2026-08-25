@@ -646,11 +646,16 @@ async function setReserveStatus(id, status) {
 
   if (detailId === id) renderReserveSection(item);
   render();
-  await save();
+  // Toast + kjærlighetsbeskjed vises UMIDDELBART (før save()), ikke etter —
+  // ellers rekker et tregt nettverkskall (eller at Auguste navigerer videre
+  // rett etter trykket) å gjøre at hun aldri ser popup-en (rapportert av
+  // Faizan 2026-08-25: hun fikk den ikke opp). Samme optimistiske mønster
+  // som render() over.
   toast(item[felt.status] ? (item[felt.status] === "reservert" ? "🎁 Reservert" : "🤔 Vurderer") : "Fjernet");
   // Kjærlighetsbeskjeden er fra Faizan til Auguste — vises kun når HUN
   // reserverer noe på HANS liste, ikke omvendt (ingen speilbeskjed skrevet).
   if (rolle === "auguste" && item[felt.status] === "reservert" && !wasReservert) showLoveNote();
+  await save();
 }
 
 // Vises KUN når hun garantert reserverer (ikke ved «vurderer» eller når hun fjerner en reservasjon)
@@ -813,6 +818,11 @@ function renderPendingBar() {
 
 function renderFilters() {
   const bar = document.getElementById("filter-bar");
+  // innerHTML-rebygging under bygger helt nye chip-row-elementer, som alltid
+  // starter på scrollLeft 0 — uten dette hopper filterraden tilbake til start
+  // hver gang man trykker på en chip (rapportert av Faizan 2026-08-13).
+  const prevCatScroll = bar.querySelector(".chip-row")?.scrollLeft || 0;
+  const prevStatusScroll = bar.querySelector(".chip-row-secondary")?.scrollLeft || 0;
   const active = activeItems();
   const catCounts = {};
   allCategories().forEach(c => { catCounts[c] = active.filter(i => (i.categories || []).includes(c)).length; });
@@ -845,6 +855,8 @@ function renderFilters() {
       <div class="chip-row">${catChips}</div>
       <div class="chip-row chip-row-secondary">${statusChips}</div>
     </div>`;
+  bar.querySelector(".chip-row").scrollLeft = prevCatScroll;
+  bar.querySelector(".chip-row-secondary").scrollLeft = prevStatusScroll;
 }
 function toggleCat(val) { filters.cat = (val === null || filters.cat === val) ? null : val; render(); }
 function toggleStatus(val) { filters.status = (val === null || filters.status === val) ? null : val; render(); }
