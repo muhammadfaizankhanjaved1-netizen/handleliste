@@ -193,6 +193,18 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
+<!-- ── Hvem er du? (vises KUN hvis enheten har mistet sitt lagrede bruker-valg,
+     f.eks. iOS som tømmer PWA-lagring — uten denne ville appen stille anta
+     "Faizan" og vise/lagre alt på feil person, se app.js resolveBruker()) ── -->
+<div class="pin-overlay" id="whoami-overlay">
+  <div class="pin-card">
+    <div class="pin-icon">👋</div>
+    <div class="pin-title">Hvem er du?</div>
+    <button type="button" class="btn-primary" onclick="velgBruker('faizan')" style="margin-bottom:10px">Faizan</button>
+    <button type="button" class="btn-primary" onclick="velgBruker('auguste')">Auguste</button>
+  </div>
+</div>
+
 <!-- ── PIN-lås (kun Auguste-modus, per enhet) ── -->
 <div class="pin-overlay" id="pin-overlay">
   <div class="pin-card">

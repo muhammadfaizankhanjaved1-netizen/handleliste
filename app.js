@@ -52,6 +52,15 @@ const AUGUSTE_PIN = "140224";
 const BRUKER_KEY = "hl-bruker";
 const AUGUSTE_UNLOCKED_KEY = "hl-auguste-unlocked";
 
+// Har enheten et EKTE lagret/URL-gitt bruker-valg, eller falt vi tilbake til
+// default? Skilt ut fra resolveBruker() slik at boot() kan vise en "Hvem er
+// du?"-velger i stedet for å stille anta "faizan" — se whoAmIOverlay lenger
+// ned. Dette hindret tidligere (rapportert av Faizan 2026-08-25) at Augustes
+// enhet, etter at localStorage ble tømt (kjent iOS PWA-lagringskvirk),
+// stille begynte å oppføre seg som om HUN var Faizan: hennes reservasjoner
+// skrev til feil felt og kjærlighetsmeldingen trigget aldri (den krever
+// eksplisitt rolle==="auguste", se setReserveStatus()).
+let brukerVarLagret = true;
 function resolveBruker() {
   const params = new URLSearchParams(location.search);
   const fromUrl = params.get("bruker");
@@ -59,7 +68,10 @@ function resolveBruker() {
     localStorage.setItem(BRUKER_KEY, fromUrl);
     return fromUrl;
   }
-  return localStorage.getItem(BRUKER_KEY) || "faizan";
+  const stored = localStorage.getItem(BRUKER_KEY);
+  if (stored === "auguste" || stored === "faizan") return stored;
+  brukerVarLagret = false;
+  return "faizan";
 }
 const bruker = resolveBruker();
 const erAuguste = bruker === "auguste";
@@ -1862,7 +1874,16 @@ async function bootApp() {
 // PIN-en er kun gyldig for fanens levetid: forlater hun fanen/appen (bakgrunn,
 // bytter app, låser telefon) fjernes opplåsingen med en gang via visibilitychange —
 // neste gang hun kommer tilbake må hun taste koden på nytt, uansett hvor kort tid det var.
+function velgBruker(valgt) {
+  localStorage.setItem(BRUKER_KEY, valgt);
+  location.reload();
+}
+
 function boot() {
+  if (!brukerVarLagret) {
+    document.getElementById("whoami-overlay")?.classList.add("show");
+    return;
+  }
   if (erAuguste) {
     // Festes uansett låst/ulåst status ved denne sideinnlastingen — ellers
     // mangler Enter-støtte hvis hun først laster siden ulåst og blir relåst
