@@ -75,6 +75,10 @@ function resolveBruker() {
 }
 const bruker = resolveBruker();
 const erAuguste = bruker === "auguste";
+// Liten fast fargeprikk ved tittelen som viser hvilken identitet DENNE
+// enheten faktisk har lagret (uavhengig av visningEier/tema) — satt her,
+// tidligst mulig, slik at den også er riktig bak PIN-/whoami-skjermen.
+document.body.classList.add(erAuguste ? "device-auguste" : "device-faizan");
 // Temaet følger hvilken LISTE som vises (visningEier), ikke hvem enheten
 // tilhører (bruker) — å besøke den andres liste skal se ut som DERES app.
 function themeKey() { return visningEier === "auguste" ? "hl-theme-auguste" : "hl-theme"; }
