@@ -842,11 +842,14 @@ function renderFilters() {
   const active = activeItems();
   const catCounts = {};
   allCategories().forEach(c => { catCounts[c] = active.filter(i => (i.categories || []).includes(c)).length; });
+  const noCatCount = active.filter(i => !(i.categories || []).length).length;
 
   const catChips = [`<button type="button" class="chip ${!filters.cat ? "active" : ""}" onclick="toggleCat(null)">Alle <span class="chip-count">${active.length}</span></button>`]
     .concat(allCategories().filter(c => catCounts[c] > 0 || filters.cat === c).map(c =>
       `<button type="button" class="chip ${filters.cat === c ? "active" : ""}" onclick="toggleCat('${c}')">${CAT_ICONS[c] ? CAT_ICONS[c] + " " : ""}${c} <span class="chip-count">${catCounts[c]}</span></button>`
-    )).join("");
+    ))
+    .concat(noCatCount > 0 ? [`<button type="button" class="chip ${filters.cat === "__none__" ? "active" : ""}" onclick="toggleCat('__none__')">🗂️ Uten kategori <span class="chip-count">${noCatCount}</span></button>`] : [])
+    .join("");
 
   const statusOptions = [
     { key: null,         label: "Alle" },
@@ -1354,7 +1357,9 @@ function render() {
   const showListChrome = view === "wishlist";
   document.querySelector(".add-bar").style.display = showListChrome ? "flex" : "none";
   document.querySelector(".add-extra").style.display = showListChrome ? "flex" : "none";
+  document.getElementById("add-cat-chips").style.display = showListChrome ? "flex" : "none";
   if (showListChrome) {
+    renderAddCatChips();
     renderPendingBar();
     renderFilters();
     renderWishlist();
@@ -1557,6 +1562,22 @@ function setupPinchGestures() {
 }
 
 // ── Legg til (lim inn lenke) ───────────────────────────────────────────────────
+// Kategori-valg i selve legg-til-boksen — uten dette starter nye varer alltid med
+// tom categories[] og blir usynlige for kategori-filtrene til noen husker å åpne
+// rediger-modalen og sette den manuelt (root cause for 20 utaggede varer 2026-09-02).
+// Valget forblir på tvers av flere legg-til (ikke nullstilt etter hver), siden
+// varer typisk limes inn i bolker av samme type (f.eks. flere Tise-klær på rad).
+const addSelectedCats = new Set();
+function toggleAddCat(c) {
+  if (addSelectedCats.has(c)) addSelectedCats.delete(c); else addSelectedCats.add(c);
+  renderAddCatChips();
+}
+function renderAddCatChips() {
+  const el = document.getElementById("add-cat-chips");
+  if (!el) return;
+  el.innerHTML = allCategories().map(c => `
+    <button type="button" class="chip add-cat-chip ${addSelectedCats.has(c) ? "active" : ""}" onclick="toggleAddCat('${c}')">${CAT_ICONS[c] ? CAT_ICONS[c] + " " : ""}${c}</button>`).join("");
+}
 async function addItem(url) {
   url = url.trim();
   if (!url || !url.startsWith("http")) { toast("Lim inn en gyldig URL", true); return; }
@@ -1579,7 +1600,7 @@ async function addItem(url) {
     price_current: manualPrice,
     price_history: manualPrice ? [{ date: now.slice(0,10), price: manualPrice }] : [],
     currency: "NOK", saved: 0, tier: null,
-    categories: [], subcategory: "", notes: "",
+    categories: [...addSelectedCats], subcategory: "", notes: "",
     last_error: null, added_at: now, purchased_at: null,
   };
   data.items.unshift(item);

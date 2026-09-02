@@ -249,6 +249,8 @@ body.device-auguste .identity-dot { background: #D6689A; }
 }
 .add-extra-input::placeholder { color: var(--faint); }
 .add-price-input { max-width: 100px; flex: none; }
+.add-cat-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 16px 12px; }
+.add-cat-chips .chip { font-size: .72rem; padding: 5px 11px; }
 .add-cur-select {
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
   padding: 0 8px; color: var(--ink); font-size: .8rem; cursor: pointer; height: 38px;
